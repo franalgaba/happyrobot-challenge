@@ -1,0 +1,43 @@
+{
+  "name": "happyrobot-challenge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun --filter @happyrobot-challenge/api dev",
+    "start": "bun --filter @happyrobot-challenge/api start",
+    "build": "bun --filter @happyrobot-challenge/api build",
+    "test": "bun --filter @happyrobot-challenge/api test",
+    "typecheck": "bun --filter @happyrobot-challenge/api typecheck && bun --filter @happyrobot-challenge/web typecheck && bunx tsc -p tsconfig.json --noEmit",
+    "validate": "bun run typecheck && bun run test && bun run build && bun run build:web",
+    "dev:up": "bun scripts/dev-up.ts",
+    "dev:down": "bun scripts/dev-down.ts",
+    "db:migrate": "bun apps/api/src/db/migrate.ts",
+    "db:seed": "bun apps/api/src/db/seed.ts",
+    "happyrobot:sync": "bun scripts/happyrobot/sync-workflow.ts",
+    "happyrobot:inspect": "bun scripts/happyrobot/inspect-session.ts",
+    "dev:web": "bun --filter @happyrobot-challenge/web dev",
+    "build:web": "bun --filter @happyrobot-challenge/web build",
+    "preview:web": "bun --filter @happyrobot-challenge/web preview"
+  },
+  "dependencies": {
+    "@happyrobot-ai/sdk": "0.1.19",
+    "@hono/node-server": "^1.14.4",
+    "@hono/zod-validator": "^0.5.0",
+    "drizzle-orm": "^0.44.2",
+    "hono": "^4.8.5",
+    "postgres": "^3.4.7",
+    "zod": "^3.25.74",
+    "zod-to-json-schema": "^3.24.6"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.17",
+    "drizzle-kit": "^0.31.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

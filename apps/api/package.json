@@ -1,0 +1,16 @@
+{
+  "name": "@happyrobot-challenge/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "tsc -p tsconfig.json && bun build src/index.ts --target=node --outdir=dist",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@happyrobot-challenge/shared": "workspace:*"
+  }
+}
