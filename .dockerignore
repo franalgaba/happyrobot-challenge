@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.git
+node_modules
+**/node_modules
+apps/api/dist
+apps/web/dist
+coverage
+tmp
+*.log
+.DS_Store
+.github
+docs
+infra
+reference

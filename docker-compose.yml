@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: happyrobot_challenge
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d happyrobot_challenge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    command: sh -c "bun run db:migrate && bun run db:seed && bun apps/api/dist/index.js"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/happyrobot_challenge
+      API_KEY: local-dev-api-key
+      MCP_PATH_TOKEN: local-dev-mcp-token
+      PUBLIC_API_BASE_URL: http://localhost:3000
+      CORS_ORIGINS: http://localhost:5173,http://localhost:4173,http://localhost:8080
+    ports:
+      - "3000:3000"
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_CLIENT_NAME: Acme Logistics
+    environment:
+      API_BASE_URL: http://api:3000
+      API_KEY: local-dev-api-key
+    depends_on:
+      - api
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:

@@ -1,0 +1,11 @@
+workspace_id       = "<railway-workspace-id>"
+project_name       = "happyrobot-challenge"
+source_repo        = "franalgaba/happyrobot-challenge"
+source_repo_branch = "main"
+api_subdomain       = "happyrobot-challenge-api"
+dashboard_subdomain = "happyrobot-challenge-dashboard"
+client_name         = "Acme Logistics"
+
+# Optional external secrets:
+# happyrobot_api_key = ""
+# fmcsa_web_key      = ""
