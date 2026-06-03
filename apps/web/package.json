@@ -1,0 +1,28 @@
+{
+  "name": "@happyrobot-challenge/web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port ${PORT:-8080}",
+    "start": "bun server.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@happyrobot-challenge/shared": "workspace:*",
+    "@tanstack/react-query": "^5.101.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.1",
+    "agentation": "^3.0.2",
+    "typescript": "^5.8.3",
+    "vite": "^6.0.0"
+  }
+}
