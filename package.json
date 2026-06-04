@@ -29,6 +29,7 @@
     "@happyrobot-ai/sdk": "0.1.19",
     "@hono/node-server": "^1.14.4",
     "@hono/zod-validator": "^0.5.0",
+    "@modelcontextprotocol/server": "^2.0.0-alpha.2",
     "drizzle-orm": "^0.44.2",
     "hono": "^4.8.5",
     "postgres": "^3.4.7",

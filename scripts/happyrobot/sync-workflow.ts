@@ -231,6 +231,9 @@ type McpServer = {
   url?: string;
   server_name?: string;
   server_url?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_connected_at?: string;
 };
 
 type McpServerPayload = {
@@ -660,6 +663,19 @@ function mcpServerMatchesUrl(server: McpServer, url: string) {
   return mcpServerUrl(server) === url;
 }
 
+function mcpServerName(server: McpServer) {
+  return server.server_name ?? server.name;
+}
+
+function mcpServerSortTime(server: McpServer) {
+  const timestamp = server.last_connected_at ?? server.updated_at ?? server.created_at;
+  return timestamp ? Date.parse(timestamp) || 0 : 0;
+}
+
+function newestMcpServer(servers: McpServer[]) {
+  return [...servers].sort((a, b) => mcpServerSortTime(b) - mcpServerSortTime(a))[0];
+}
+
 async function registerMcp(client: HappyRobotClient, url: string, dryRun: boolean) {
   if (dryRun) {
     console.log(`Would register MCP server "${MCP_SERVER_NAME}" at ${url}`);
@@ -667,7 +683,11 @@ async function registerMcp(client: HappyRobotClient, url: string, dryRun: boolea
   }
 
   const { data } = await client.mcp.list();
-  const existing = (data as McpServer[]).find((server) => mcpServerMatchesUrl(server, url));
+  const matches = (data as McpServer[]).filter((server) => mcpServerMatchesUrl(server, url) && mcpServerName(server) === MCP_SERVER_NAME);
+  const existing = newestMcpServer(matches);
+  if (matches.length > 1) {
+    console.log(`Found ${matches.length} MCP server registrations for ${redactMcpUrl(url)}; using newest ${mcpServerId(existing)}.`);
+  }
   const server = existing ?? (await client.mcp.create(mcpPayload(url)));
   const id = mcpServerId(server as McpServer);
 

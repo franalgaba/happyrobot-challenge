@@ -1,139 +1,101 @@
 import { Hono } from "hono";
+import { McpServer, WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 import type { AppServices } from "../services/types";
-import { ServiceError } from "../utils/errors";
 import { jsonError } from "../utils/http";
-import { logError, logWarn, requestFields } from "../utils/logging";
-import { getRequestId } from "../utils/request-context";
+import { logError } from "../utils/logging";
 import { callMcpTool, mcpTools } from "./tools";
+import type { JsonSchemaType, StandardSchemaWithJSON } from "@modelcontextprotocol/server";
 
 const MCP_SERVER_NAME = "happyrobot-carrier-sales-tools";
-const MCP_TRANSPORT = "streamable-http-json-rpc";
-const MCP_PROTOCOL_VERSION = "2024-11-05";
 const MCP_SERVER_VERSION = "0.1.0";
-const JSON_RPC_PARSE_ERROR = -32700;
-const JSON_RPC_METHOD_NOT_FOUND = -32601;
-const JSON_RPC_TOOL_ERROR = -32000;
-
-type JsonRpcRequest = {
-  jsonrpc?: string;
-  id?: string | number | null;
-  method?: string;
-  params?: Record<string, unknown>;
-};
-
-function jsonRpcResult(id: JsonRpcRequest["id"], result: unknown) {
-  return { jsonrpc: "2.0", id: id ?? null, result };
-}
-
-function jsonRpcError(id: JsonRpcRequest["id"], code: number, message: string, data?: unknown) {
-  return { jsonrpc: "2.0", id: id ?? null, error: { code, message, data } };
-}
-
-function jsonRpcToolError(id: JsonRpcRequest["id"], error: unknown, requestId: string) {
-  if (error instanceof ServiceError) {
-    return jsonRpcError(id, JSON_RPC_TOOL_ERROR, "MCP tool call failed.", {
-      code: error.code,
-      status: error.status,
-      requestId,
-    });
-  }
-
-  return jsonRpcError(id, JSON_RPC_TOOL_ERROR, "MCP tool call failed.", { requestId });
-}
-
-function mcpMetadata() {
-  return {
-    name: MCP_SERVER_NAME,
-    transport: MCP_TRANSPORT,
-    tools: mcpTools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
-  };
-}
-
-function initializeResult() {
-  return {
-    protocolVersion: MCP_PROTOCOL_VERSION,
-    capabilities: { tools: {} },
-    serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
-  };
-}
 
 function mcpTokenIsValid(token: string, expectedToken: string) {
   return token === expectedToken;
 }
 
-function toolCallResult(result: unknown) {
-  return {
-    content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-    structuredContent: result,
-  };
-}
-
-function safeMcpArgumentKeys(body: JsonRpcRequest | undefined) {
-  const args = body?.params?.arguments;
+function safeMcpArgumentKeys(args: unknown) {
   return typeof args === "object" && args !== null && !Array.isArray(args) ? Object.keys(args) : [];
 }
 
-async function handleJsonRpcRequest(services: AppServices, body: JsonRpcRequest, requestId: string) {
-  if (body.method === "initialize") {
-    return jsonRpcResult(body.id, initializeResult());
+function structuredContent(result: unknown) {
+  return typeof result === "object" && result !== null && !Array.isArray(result) ? (result as Record<string, unknown>) : undefined;
+}
+
+function toolCallResult(result: unknown) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+    structuredContent: structuredContent(result),
+  };
+}
+
+function requestWithMcpAcceptHeader(request: Request) {
+  if (request.headers.has("Accept")) {
+    return request;
   }
 
-  if (body.method === "tools/list") {
-    return jsonRpcResult(body.id, { tools: mcpTools });
+  const headers = new Headers(request.headers);
+  headers.set("Accept", "application/json, text/event-stream");
+  return new Request(request, { headers });
+}
+
+function passThroughMcpInputSchema(schema: JsonSchemaType): StandardSchemaWithJSON<unknown, unknown> {
+  return {
+    "~standard": {
+      version: 1,
+      vendor: "happyrobot-challenge",
+      validate: (value: unknown) => ({ value }),
+      jsonSchema: {
+        input: () => schema as Record<string, unknown>,
+        output: () => schema as Record<string, unknown>,
+      },
+    },
+  };
+}
+
+function createSdkMcpServer(services: AppServices) {
+  const server = new McpServer({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION });
+
+  for (const tool of mcpTools) {
+    server.registerTool(
+      tool.name,
+      {
+        description: tool.description,
+        inputSchema: passThroughMcpInputSchema(tool.inputSchema as JsonSchemaType),
+      },
+      async (args) => {
+        try {
+          return toolCallResult(await callMcpTool(services, tool.name, args));
+        } catch (error) {
+          logError("mcp_tool_error", error, {
+            operation: "mcp_tool",
+            mcpToolName: tool.name,
+            mcpArgKeys: safeMcpArgumentKeys(args),
+          });
+          throw new Error("MCP tool call failed.");
+        }
+      },
+    );
   }
 
-  if (body.method === "tools/call") {
-    const toolName = String(body.params?.name ?? "");
-    const args = body.params?.arguments ?? {};
-    const result = await callMcpTool(services, toolName, args);
-    return jsonRpcResult(body.id, toolCallResult(result));
-  }
-
-  return jsonRpcError(body.id, JSON_RPC_METHOD_NOT_FOUND, `Unsupported method: ${body.method}`, { requestId });
+  return server;
 }
 
 export function createMcpRoutes(services: AppServices, mcpPathToken: string) {
   const mcp = new Hono();
-
-  mcp.get("/:token", async (c) => {
-    if (!mcpTokenIsValid(c.req.param("token"), mcpPathToken)) {
-      return jsonError(c, 404, "mcp_not_found", "MCP server was not found.");
-    }
-    return c.json(mcpMetadata());
+  const server = createSdkMcpServer(services);
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    enableJsonResponse: true,
+    sessionIdGenerator: undefined,
   });
+  const connected = server.connect(transport);
 
-  mcp.post("/:token", async (c) => {
+  mcp.all("/:token", async (c) => {
     if (!mcpTokenIsValid(c.req.param("token"), mcpPathToken)) {
       return jsonError(c, 404, "mcp_not_found", "MCP server was not found.");
     }
 
-    let body: JsonRpcRequest | undefined;
-    try {
-      body = (await c.req.json()) as JsonRpcRequest;
-
-      if (body.method === "notifications/initialized") {
-        return c.body(null, 202);
-      }
-
-      const result = await handleJsonRpcRequest(services, body, getRequestId(c));
-      return c.json(result, "error" in result ? 400 : 200);
-    } catch (error) {
-      const fields = requestFields(c, {
-        operation: "mcp_json_rpc",
-        rpcMethod: body?.method,
-        rpcId: body?.id,
-        mcpToolName: body?.params?.name,
-        mcpArgKeys: safeMcpArgumentKeys(body),
-      });
-
-      if (error instanceof SyntaxError) {
-        logWarn("mcp_parse_error", fields);
-        return c.json(jsonRpcError(null, JSON_RPC_PARSE_ERROR, "Parse error", { requestId: getRequestId(c) }), 400);
-      }
-
-      logError("mcp_tool_error", error, fields);
-      return c.json(jsonRpcToolError(body?.id ?? null, error, getRequestId(c)), 500);
-    }
+    await connected;
+    return transport.handleRequest(requestWithMcpAcceptHeader(c.req.raw));
   });
 
   return mcp;

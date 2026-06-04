@@ -255,6 +255,39 @@ describe("Hono API", () => {
     expect(response.status).toBe(202);
   });
 
+  it("accepts generic MCP notifications", async () => {
+    const response = await postMcp({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: "tool-call-1" } });
+    expect(response.status).toBe(202);
+  });
+
+  it("negotiates requested MCP protocol versions", async () => {
+    const response = await postMcp({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "test-client", version: "1.0.0" },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      result: {
+        protocolVersion: "2025-06-18",
+        capabilities: { tools: {} },
+        serverInfo: { name: "happyrobot-carrier-sales-tools" },
+      },
+    });
+  });
+
+  it("responds to MCP ping requests", async () => {
+    const response = await postMcp({ jsonrpc: "2.0", id: "ping-1", method: "ping" });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ jsonrpc: "2.0", id: "ping-1", result: {} });
+  });
+
   it("returns a JSON-RPC parse error for malformed MCP JSON", async () => {
     const response = await app().request(`/mcp/${MCP_PATH_TOKEN}`, {
       method: "POST",
@@ -264,7 +297,7 @@ describe("Hono API", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
-      error: { code: -32700, message: "Parse error", data: { requestId: REQUEST_ID } },
+      error: { code: -32700, message: "Parse error: Invalid JSON" },
     });
   });
 
@@ -285,9 +318,12 @@ describe("Hono API", () => {
       },
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      error: { code: -32000, message: "MCP tool call failed." },
+      result: {
+        isError: true,
+        content: [expect.objectContaining({ type: "text", text: "MCP tool call failed." })],
+      },
     });
   });
 
@@ -330,10 +366,10 @@ describe("Hono API", () => {
       { carriers: { verifyCarrier } },
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     expect(verifyCarrier).not.toHaveBeenCalled();
     await expect(response.json()).resolves.toMatchObject({
-      error: { code: -32000, message: "MCP tool call failed." },
+      result: { isError: true },
     });
   });
 
@@ -417,8 +453,11 @@ describe("Hono API", () => {
       { negotiations: { negotiateOffer } },
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     expect(negotiateOffer).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({
+      result: { isError: true },
+    });
   });
 
   it("rejects missing required finalization MCP arguments", async () => {
@@ -433,7 +472,10 @@ describe("Hono API", () => {
       { calls: { finalizeCall } },
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     expect(finalizeCall).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({
+      result: { isError: true },
+    });
   });
 });
