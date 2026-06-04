@@ -7,7 +7,6 @@ import { invalidRequest, notFound } from "../utils/errors";
 import { normalizeMcNumber, toNumber } from "../utils/http";
 import type { NegotiationService } from "./types";
 
-const TRANSFER_MESSAGE = "Transfer was successful and now you can wrap up the conversation.";
 const MAX_NEGOTIATION_ROUNDS = 3;
 const FIRST_COUNTER_ROUND = 1;
 const SECOND_COUNTER_ROUND = 2;
@@ -32,10 +31,18 @@ function statusForDecision(decision: NegotiationDecision): NegotiationStatus {
   return "countered";
 }
 
-function messageForDecision(decision: NegotiationDecision, counterRate: number | null) {
-  if (decision === "transfer_mock") return TRANSFER_MESSAGE;
-  if (decision === "counter") return `We can offer ${counterRate} on this load.`;
-  return "We cannot accept that rate after three negotiation rounds.";
+function formatRate(rate: number) {
+  return `$${rate.toLocaleString("en-US")}`;
+}
+
+function messageForDecision(decision: NegotiationDecision, counterRate: number | null, agreedRate: number | null) {
+  if (decision === "transfer_mock") {
+    return `All set. I have you booked on this load at ${formatRate(agreedRate ?? 0)}.`;
+  }
+  if (decision === "counter" && counterRate != null) {
+    return `I can do ${formatRate(counterRate)} on this load.`;
+  }
+  return "I cannot get approval at that rate. I can check for another option if you want.";
 }
 
 export function decideNegotiation(input: {
@@ -59,7 +66,7 @@ export function decideNegotiation(input: {
     counterRate,
     agreedRate,
     status: statusForDecision(decision),
-    message: messageForDecision(decision, counterRate),
+    message: messageForDecision(decision, counterRate, agreedRate),
     remainingRounds: Math.max(0, MAX_NEGOTIATION_ROUNDS - currentRound),
     carrierOfferRate,
   };

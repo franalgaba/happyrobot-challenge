@@ -409,9 +409,16 @@ function paragraph(text: string) {
 }
 
 function mcpToolMessage(toolName: string) {
+  const descriptions: Record<string, string> = {
+    verify_carrier: "If needed, use a short natural bridge like: One moment, let me check that.",
+    search_loads: "If needed, use a short natural bridge like: Got it, let me see what is available.",
+    negotiate_offer: "If needed, use a short natural bridge like: Let me see what I can do.",
+    finalize_call: "Do not announce this action to the caller.",
+  };
+
   return {
     type: "ai",
-    description: paragraph(`Inform the user about the ${toolName} action`),
+    description: paragraph(descriptions[toolName] ?? "Keep any caller-facing bridge short and natural."),
   };
 }
 

@@ -30,7 +30,7 @@ describe("negotiation policy", () => {
       decision: "transfer_mock",
       currentRound: 2,
       agreedRate: 2350,
-      message: "Transfer was successful and now you can wrap up the conversation.",
+      message: "All set. I have you booked on this load at $2,350.",
     });
   });
 
