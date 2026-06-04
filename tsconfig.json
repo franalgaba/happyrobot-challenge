@@ -6,6 +6,6 @@
   "include": [
     "packages/**/*.ts",
     "scripts/**/*.ts",
-    "drizzle.config.ts"
+    "apps/api/drizzle.config.ts"
   ]
 }
