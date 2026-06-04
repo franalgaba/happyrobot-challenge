@@ -7,10 +7,8 @@ import { createMcpRoutes } from "./mcp/routes";
 import { createApiRoutes } from "./routes/api";
 import type { AppServices } from "./services/types";
 import { jsonError } from "./utils/http";
-
-function redactSensitivePath(path: string) {
-  return path.replace(/^\/mcp\/[^/?#]+/, "/mcp/<redacted>");
-}
+import { logError, logInfo, redactPathForLogs, requestFields } from "./utils/logging";
+import { requestIdFromHeader, REQUEST_ID_HEADER, setRequestId } from "./utils/request-context";
 
 function digest(value: string) {
   return createHash("sha256").update(value).digest();
@@ -24,15 +22,32 @@ function matchesSecret(provided: string | undefined, expected: string) {
   return timingSafeEqual(digest(provided), digest(expected));
 }
 
-function requestLogger(): MiddlewareHandler {
+function requestTracing(): MiddlewareHandler {
   return async (c, next) => {
-    const method = c.req.method;
-    const path = redactSensitivePath(c.req.path);
     const startedAt = Date.now();
+    const requestId = requestIdFromHeader(c.req.header(REQUEST_ID_HEADER));
+    const logFields = {
+      requestId,
+      method: c.req.method,
+      path: redactPathForLogs(c.req.path),
+    };
 
-    console.log(`<-- ${method} ${path}`);
-    await next();
-    console.log(`--> ${method} ${path} ${c.res.status} ${Date.now() - startedAt}ms`);
+    setRequestId(c, requestId);
+    logInfo("request_started", {
+      ...logFields,
+      userAgent: c.req.header("User-Agent"),
+    });
+
+    try {
+      await next();
+    } finally {
+      c.header(REQUEST_ID_HEADER, requestId);
+      logInfo("request_finished", {
+        ...logFields,
+        status: c.res.status,
+        durationMs: Date.now() - startedAt,
+      });
+    }
   };
 }
 
@@ -53,7 +68,7 @@ export function createApp(
 ) {
   const app = new Hono();
 
-  app.use(requestLogger());
+  app.use(requestTracing());
 
   app.get("/health", (c) => c.json({ ok: true }));
 
@@ -73,7 +88,7 @@ export function createApp(
 
   app.notFound((c) => jsonError(c, 404, "not_found", "Route not found."));
   app.onError((error, c) => {
-    console.error(error);
+    logError("request_unhandled_error", error, requestFields(c));
     return jsonError(c, 500, "internal_error", "Internal server error.");
   });
 

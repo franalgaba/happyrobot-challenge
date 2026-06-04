@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import type { AppServices } from "../services/types";
 import { ServiceError } from "../utils/errors";
 import { jsonError } from "../utils/http";
+import { logError, logWarn, requestFields } from "../utils/logging";
+import { getRequestId } from "../utils/request-context";
 import { callMcpTool, mcpTools } from "./tools";
 
 const MCP_SERVER_NAME = "happyrobot-carrier-sales-tools";
@@ -27,15 +29,16 @@ function jsonRpcError(id: JsonRpcRequest["id"], code: number, message: string, d
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message, data } };
 }
 
-function jsonRpcToolError(id: JsonRpcRequest["id"], error: unknown) {
+function jsonRpcToolError(id: JsonRpcRequest["id"], error: unknown, requestId: string) {
   if (error instanceof ServiceError) {
     return jsonRpcError(id, JSON_RPC_TOOL_ERROR, "MCP tool call failed.", {
       code: error.code,
       status: error.status,
+      requestId,
     });
   }
 
-  return jsonRpcError(id, JSON_RPC_TOOL_ERROR, "MCP tool call failed.");
+  return jsonRpcError(id, JSON_RPC_TOOL_ERROR, "MCP tool call failed.", { requestId });
 }
 
 function mcpMetadata() {
@@ -65,7 +68,7 @@ function toolCallResult(result: unknown) {
   };
 }
 
-async function handleJsonRpcRequest(services: AppServices, body: JsonRpcRequest) {
+async function handleJsonRpcRequest(services: AppServices, body: JsonRpcRequest, requestId: string) {
   if (body.method === "initialize") {
     return jsonRpcResult(body.id, initializeResult());
   }
@@ -81,7 +84,7 @@ async function handleJsonRpcRequest(services: AppServices, body: JsonRpcRequest)
     return jsonRpcResult(body.id, toolCallResult(result));
   }
 
-  return jsonRpcError(body.id, JSON_RPC_METHOD_NOT_FOUND, `Unsupported method: ${body.method}`);
+  return jsonRpcError(body.id, JSON_RPC_METHOD_NOT_FOUND, `Unsupported method: ${body.method}`, { requestId });
 }
 
 export function createMcpRoutes(services: AppServices, mcpPathToken: string) {
@@ -107,14 +110,22 @@ export function createMcpRoutes(services: AppServices, mcpPathToken: string) {
         return c.body(null, 202);
       }
 
-      const result = await handleJsonRpcRequest(services, body);
+      const result = await handleJsonRpcRequest(services, body, getRequestId(c));
       return c.json(result, "error" in result ? 400 : 200);
     } catch (error) {
+      const fields = requestFields(c, {
+        operation: "mcp_json_rpc",
+        rpcMethod: body?.method,
+        rpcId: body?.id,
+      });
+
       if (error instanceof SyntaxError) {
-        return c.json(jsonRpcError(null, JSON_RPC_PARSE_ERROR, "Parse error"), 400);
+        logWarn("mcp_parse_error", fields);
+        return c.json(jsonRpcError(null, JSON_RPC_PARSE_ERROR, "Parse error", { requestId: getRequestId(c) }), 400);
       }
 
-      return c.json(jsonRpcToolError(body?.id ?? null, error), 500);
+      logError("mcp_tool_error", error, fields);
+      return c.json(jsonRpcToolError(body?.id ?? null, error, getRequestId(c)), 500);
     }
   });
 

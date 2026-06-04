@@ -209,6 +209,7 @@ export const ApiErrorSchema = z.object({
   error: z.object({
     code: z.string(),
     message: z.string(),
+    requestId: z.string().optional(),
     details: z.unknown().optional(),
   }),
 });

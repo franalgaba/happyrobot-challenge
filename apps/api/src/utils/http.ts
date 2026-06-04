@@ -1,11 +1,15 @@
 import type { Context } from "hono";
+import { getRequestId } from "./request-context";
 
 export function jsonError(c: Context, status: number, code: string, message: string, details?: unknown) {
+  const requestId = getRequestId(c);
+
   return c.json(
     {
       error: {
         code,
         message,
+        requestId,
         ...(details === undefined ? {} : { details }),
       },
     },

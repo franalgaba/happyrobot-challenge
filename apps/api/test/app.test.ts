@@ -9,6 +9,7 @@ const API_KEY = "test-api-key";
 const MCP_PATH_TOKEN = "test-mcp-token";
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const AUTHENTICATED_JSON_HEADERS = { ...JSON_HEADERS, "X-API-Key": API_KEY };
+const REQUEST_ID = "test-request-123";
 
 function emptyReportSummary(): ReportSummary {
   return {
@@ -105,6 +106,42 @@ describe("Hono API", () => {
     expect(response.status).toBe(401);
   });
 
+  it("propagates request IDs in headers and API error responses", async () => {
+    const response = await app().request("/api/reports/summary", {
+      headers: { "X-Request-ID": REQUEST_ID },
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("X-Request-ID")).toBe(REQUEST_ID);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "unauthorized",
+        requestId: REQUEST_ID,
+      },
+    });
+  });
+
+  it("returns request validation details", async () => {
+    const response = await postJson("/api/tools/verify-carrier", {});
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "invalid_request",
+        requestId: expect.any(String),
+        details: {
+          issues: [
+            {
+              path: "mcNumber",
+              code: "invalid_type",
+              message: expect.any(String),
+            },
+          ],
+        },
+      },
+    });
+  });
+
   it("verifies a carrier through the API route", async () => {
     const response = await postJson("/api/tools/verify-carrier", { mcNumber: "MC-123456" });
     expect(response.status).toBe(200);
@@ -193,12 +230,14 @@ describe("Hono API", () => {
   it("returns a JSON-RPC parse error for malformed MCP JSON", async () => {
     const response = await app().request(`/mcp/${MCP_PATH_TOKEN}`, {
       method: "POST",
-      headers: JSON_HEADERS,
+      headers: { ...JSON_HEADERS, "X-Request-ID": REQUEST_ID },
       body: "{",
     });
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ error: { code: -32700, message: "Parse error" } });
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: -32700, message: "Parse error", data: { requestId: REQUEST_ID } },
+    });
   });
 
   it("hides MCP tool error details", async () => {
