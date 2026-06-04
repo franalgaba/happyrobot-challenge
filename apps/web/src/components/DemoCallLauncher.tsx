@@ -25,10 +25,13 @@ export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
       const tokenResponse: VoiceTokenResponse = await fetchVoiceToken();
       setRunId(tokenResponse.run_id);
 
-      const voice = new HappyRobotVoiceClient({
+      const voiceConfig = {
         url: tokenResponse.url,
         token: tokenResponse.token,
-      });
+        room_name: tokenResponse.room_name,
+      };
+
+      const voice = new HappyRobotVoiceClient(voiceConfig);
 
       const connection = await voice.connect({
         onConnected: () => setStatus("connected"),

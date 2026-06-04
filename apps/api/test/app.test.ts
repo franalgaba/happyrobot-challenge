@@ -301,4 +301,50 @@ describe("Hono API", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ result: { structuredContent: { eligible: true } } });
   });
+
+  it("normalizes HappyRobot MCP message arguments for carrier verification", async () => {
+    const verifyCarrier = vi.fn(services().carriers.verifyCarrier);
+    const response = await postMcp(
+      {
+        jsonrpc: "2.0",
+        id: 4,
+        method: "tools/call",
+        params: { name: "verify_carrier", arguments: { _message: "Verifying MC 123456." } },
+      },
+      { carriers: { verifyCarrier } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(verifyCarrier).toHaveBeenCalledWith({ mcNumber: "123456" });
+  });
+
+  it("normalizes templated string values for numeric MCP arguments", async () => {
+    const negotiateOffer = vi.fn(services().negotiations.negotiateOffer);
+    const response = await postMcp(
+      {
+        jsonrpc: "2.0",
+        id: 5,
+        method: "tools/call",
+        params: {
+          name: "negotiate_offer",
+          arguments: {
+            sessionId: "session-1",
+            negotiationId: "",
+            loadId: "HR-ATL-DAL-001",
+            mcNumber: "123456",
+            carrierOfferRate: "2,600",
+          },
+        },
+      },
+      { negotiations: { negotiateOffer } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(negotiateOffer).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      loadId: "HR-ATL-DAL-001",
+      mcNumber: "123456",
+      carrierOfferRate: 2600,
+    });
+  });
 });

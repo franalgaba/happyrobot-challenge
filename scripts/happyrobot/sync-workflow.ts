@@ -17,18 +17,187 @@ const TOOL_DEFINITIONS = [
   {
     name: "verify_carrier",
     description: "Use this tool after the caller gives an MC number and before discussing load details. It verifies carrier eligibility.",
+    parameters: [
+      {
+        name: "mcNumber",
+        type: "string",
+        required: true,
+        example: "123456",
+        description: "Carrier MC number from the caller, with or without an MC prefix.",
+      },
+    ],
   },
   {
     name: "search_loads",
     description: "Use this tool after the carrier describes lane, equipment, or pickup preferences. It finds matching active loads.",
+    parameters: [
+      {
+        name: "origin",
+        type: "string",
+        required: false,
+        example: "Atlanta, GA",
+        description: "Pickup origin city and state requested by the carrier.",
+      },
+      {
+        name: "destination",
+        type: "string",
+        required: false,
+        example: "Dallas, TX",
+        description: "Delivery destination city and state requested by the carrier.",
+      },
+      {
+        name: "equipmentType",
+        type: "string",
+        required: false,
+        example: "Dry Van",
+        description: "Equipment type requested by the carrier.",
+      },
+      {
+        name: "pickupDate",
+        type: "string",
+        required: false,
+        example: "2026-06-05",
+        description: "Preferred pickup date in ISO date format when the caller gives one.",
+      },
+      {
+        name: "limit",
+        type: "number",
+        required: false,
+        example: "3",
+        description: "Maximum number of loads to return. Use 3 for normal calls.",
+      },
+    ],
   },
   {
     name: "negotiate_offer",
     description: "Use this tool whenever the carrier makes a rate offer or counteroffer. It decides whether to accept, counter, or reject.",
+    parameters: [
+      {
+        name: "sessionId",
+        type: "string",
+        required: true,
+        example: "call-session-123",
+        description: "Stable call-specific HappyRobot session, run, or room identifier.",
+      },
+      {
+        name: "negotiationId",
+        type: "string",
+        required: false,
+        example: "uuid-from-previous-response",
+        description: "Existing negotiation ID returned by the previous negotiation response for the same load.",
+      },
+      {
+        name: "loadId",
+        type: "string",
+        required: true,
+        example: "HR-ATL-DAL-001",
+        description: "Load ID the carrier is negotiating for.",
+      },
+      {
+        name: "mcNumber",
+        type: "string",
+        required: true,
+        example: "123456",
+        description: "Verified carrier MC number.",
+      },
+      {
+        name: "carrierOfferRate",
+        type: "number",
+        required: true,
+        example: "2600",
+        description: "Carrier's current offer rate as a numeric dollar amount.",
+      },
+    ],
   },
   {
     name: "finalize_call",
     description: "Use this tool before ending every call to persist the outcome, sentiment, summary, and extracted carrier/load details.",
+    parameters: [
+      {
+        name: "happyrobotRunId",
+        type: "string",
+        required: false,
+        example: "run-123",
+        description: "HappyRobot run ID when available.",
+      },
+      {
+        name: "happyrobotSessionId",
+        type: "string",
+        required: false,
+        example: "session-123",
+        description: "HappyRobot session or room identifier when available.",
+      },
+      {
+        name: "negotiationId",
+        type: "string",
+        required: false,
+        example: "uuid-from-negotiation",
+        description: "Negotiation ID from the negotiation tool when available.",
+      },
+      {
+        name: "loadId",
+        type: "string",
+        required: false,
+        example: "HR-ATL-DAL-001",
+        description: "Selected or discussed load ID when available.",
+      },
+      {
+        name: "mcNumber",
+        type: "string",
+        required: false,
+        example: "123456",
+        description: "Carrier MC number when collected.",
+      },
+      {
+        name: "outcome",
+        type: "string",
+        required: true,
+        example: "booked",
+        description: "Final outcome: booked, rejected, no_match, ineligible, transferred, follow_up, or human_review.",
+      },
+      {
+        name: "sentiment",
+        type: "string",
+        required: true,
+        example: "neutral",
+        description: "Caller sentiment: positive, neutral, negative, or mixed.",
+      },
+      {
+        name: "agreedRate",
+        type: "number",
+        required: false,
+        example: "2350",
+        description: "Agreed rate as a numeric dollar amount when booked.",
+      },
+      {
+        name: "transferMock",
+        type: "boolean",
+        required: false,
+        example: "true",
+        description: "True when the mock transfer completed successfully.",
+      },
+      {
+        name: "summary",
+        type: "string",
+        required: false,
+        example: "Verified carrier booked HR-ATL-DAL-001 at 2350.",
+        description: "Brief summary of the call and final disposition.",
+      },
+      {
+        name: "transcript",
+        type: "string",
+        required: false,
+        example: "Caller provided MC 123456...",
+        description: "Transcript or compact transcript summary when available.",
+      },
+      {
+        name: "extractedData",
+        type: "object",
+        required: false,
+        example: "{\"carrier\":{\"mcNumber\":\"123456\"}}",
+        description: "JSON object with known carrier, requested lane, selected load, negotiation, and demo details.",
+      },
+    ],
   },
 ] as const;
 
@@ -232,6 +401,27 @@ function emptyToolMessage() {
   };
 }
 
+function toolParameters(tool: (typeof TOOL_DEFINITIONS)[number]) {
+  return tool.parameters.map((parameter) => ({
+    name: parameter.name,
+    type: parameter.type,
+    required: parameter.required,
+    example: parameter.example,
+    description: paragraph(parameter.description),
+  }));
+}
+
+function templatedParameterValue(parameterName: string) {
+  return `@${parameterName}`;
+}
+
+function toolArgs(tool: (typeof TOOL_DEFINITIONS)[number]) {
+  return tool.parameters.map((parameter) => ({
+    key: parameter.name,
+    value: templatedParameterValue(parameter.name),
+  }));
+}
+
 function nodeName(node: WorkflowNode) {
   return node.name?.toLowerCase() ?? "";
 }
@@ -287,10 +477,12 @@ async function configureVoiceAgentNode(client: HappyRobotClient, versionId: stri
 }
 
 function mcpCallConfiguration(toolName: string, credentialId: string) {
+  const tool = TOOL_DEFINITIONS.find((definition) => definition.name === toolName);
+
   return {
     credentialId,
     tool_name: toolName,
-    tool_args: [],
+    tool_args: tool ? toolArgs(tool) : [],
     dynamic_headers: [],
   };
 }
@@ -311,6 +503,7 @@ async function upsertToolNode(
     sort_index: sortIndex,
     function: {
       description: paragraph(tool.description),
+      parameters: toolParameters(tool),
       message: emptyToolMessage(),
     },
   };
