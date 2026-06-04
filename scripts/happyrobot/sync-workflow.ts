@@ -423,14 +423,14 @@ function toolParameters(tool: (typeof TOOL_DEFINITIONS)[number]) {
   }));
 }
 
-function templatedParameterValue(parameterName: string) {
-  return `@${parameterName}`;
+function templatedParameterValue(toolName: string, parameterName: string) {
+  return `{{${toolName}.${parameterName}}}`;
 }
 
 function toolArgs(tool: (typeof TOOL_DEFINITIONS)[number]) {
   return tool.parameters.map((parameter) => ({
     key: parameter.name,
-    value: templatedParameterValue(parameter.name),
+    value: templatedParameterValue(tool.name, parameter.name),
   }));
 }
 
@@ -493,6 +493,13 @@ function mcpCallConfiguration(toolName: string, credentialId: string) {
 
   return {
     credentialId,
+    credential: {
+      type: "static",
+      static: {
+        id: credentialId,
+        name: MCP_SERVER_NAME,
+      },
+    },
     tool_name: toolName,
     tool_args: tool ? toolArgs(tool) : [],
     dynamic_headers: [],
@@ -676,6 +683,11 @@ async function publishVersion(client: HappyRobotClient, workflowId: string, vers
     await client.versions.publish(versionId, { environment: happyRobotEnvironment() });
   } catch (error) {
     const message = describeSdkError(error);
+    if (message.includes("Version is already live")) {
+      console.log(`Workflow ${workflowId} version ${versionId} is already live.`);
+      return;
+    }
+
     if (!message.includes("already has a live version")) {
       throw error;
     }
