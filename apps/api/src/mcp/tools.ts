@@ -8,6 +8,10 @@ import {
 import type { AppServices } from "../services/types";
 import type { z } from "zod";
 
+const MCP_MESSAGE_MC_NUMBER_PATTERN = /\b(?:MC\s*)?(\d{5,8})\b/i;
+const UNRESOLVED_TEMPLATE_VALUE_PATTERN = /^@[A-Za-z_][\w.]*$/;
+const NUMERIC_MCP_FIELDS = new Set(["limit", "carrierOfferRate", "agreedRate"]);
+
 type JsonSchemaObject = {
   type?: string;
   properties?: Record<string, unknown>;
@@ -45,6 +49,9 @@ export const mcpTools = [
   },
 ] as const;
 
+type McpToolName = (typeof mcpTools)[number]["name"];
+type McpToolHandler = (services: AppServices, args: unknown) => Promise<unknown> | unknown;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -54,7 +61,7 @@ function extractMcNumberFromMessage(value: unknown) {
     return undefined;
   }
 
-  const match = /\b(?:MC\s*)?(\d{5,8})\b/i.exec(value);
+  const match = MCP_MESSAGE_MC_NUMBER_PATTERN.exec(value);
   return match?.[1];
 }
 
@@ -88,13 +95,15 @@ function booleanFromMcpValue(value: unknown) {
 }
 
 function isUnresolvedTemplateValue(value: unknown) {
-  return typeof value === "string" && /^@[A-Za-z_][\w.]*$/.test(value.trim());
+  return typeof value === "string" && UNRESOLVED_TEMPLATE_VALUE_PATTERN.test(value.trim());
+}
+
+function hasValue(value: unknown) {
+  return value !== "" && value !== undefined && value !== null && !isUnresolvedTemplateValue(value);
 }
 
 function stripEmptyOptionalValues(args: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(args).filter(([, value]) => value !== "" && value !== undefined && value !== null && !isUnresolvedTemplateValue(value)),
-  );
+  return Object.fromEntries(Object.entries(args).filter(([, value]) => hasValue(value)));
 }
 
 function objectFromMcpValue(value: unknown) {
@@ -114,58 +123,74 @@ function objectFromMcpValue(value: unknown) {
   }
 }
 
+function normalizeMcNumber(args: Record<string, unknown>) {
+  if (typeof args.mcNumber === "string") {
+    return args;
+  }
+
+  const mcNumber = extractMcNumberFromMessage(args._message);
+  return mcNumber ? { ...args, mcNumber } : args;
+}
+
+function normalizeNumericFields(args: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(args).map(([fieldName, value]) => [
+      fieldName,
+      NUMERIC_MCP_FIELDS.has(fieldName) ? numberFromMcpValue(value) : value,
+    ]),
+  );
+}
+
+function normalizeTransferMock(args: Record<string, unknown>) {
+  if (!("transferMock" in args)) {
+    return args;
+  }
+
+  return { ...args, transferMock: booleanFromMcpValue(args.transferMock) };
+}
+
+function normalizeFinalizationData(toolName: string, args: Record<string, unknown>) {
+  if (toolName !== "finalize_call" || !("extractedData" in args)) {
+    return args;
+  }
+
+  const extractedData = objectFromMcpValue(args.extractedData);
+  if (isRecord(extractedData)) {
+    return { ...args, extractedData };
+  }
+
+  const { extractedData: _invalidExtractedData, ...argsWithoutExtractedData } = args;
+  return argsWithoutExtractedData;
+}
+
 function normalizeMcpToolArgs(name: string, args: unknown) {
   if (!isRecord(args)) {
     return args;
   }
 
-  const normalized = stripEmptyOptionalValues({ ...args });
-  if (typeof normalized.mcNumber !== "string") {
-    const mcNumber = extractMcNumberFromMessage(normalized._message);
-    if (mcNumber) {
-      normalized.mcNumber = mcNumber;
-    }
-  }
+  const argsWithOptionalValuesRemoved = stripEmptyOptionalValues(args);
+  const argsWithMcNumber = normalizeMcNumber(argsWithOptionalValuesRemoved);
+  const argsWithNumericValues = normalizeNumericFields(argsWithMcNumber);
+  const argsWithTransferMock = normalizeTransferMock(argsWithNumericValues);
+  return normalizeFinalizationData(name, argsWithTransferMock);
+}
 
-  if ("limit" in normalized) {
-    normalized.limit = numberFromMcpValue(normalized.limit);
-  }
+const mcpToolHandlers: Record<McpToolName, McpToolHandler> = {
+  verify_carrier: (services, args) => services.carriers.verifyCarrier(VerifyCarrierRequestSchema.parse(args)),
+  search_loads: (services, args) => services.loads.searchLoads(SearchLoadsRequestSchema.parse(args)),
+  negotiate_offer: (services, args) => services.negotiations.negotiateOffer(NegotiateOfferRequestSchema.parse(args)),
+  finalize_call: (services, args) => services.calls.finalizeCall(FinalizeCallRequestSchema.parse(args)),
+};
 
-  if ("carrierOfferRate" in normalized) {
-    normalized.carrierOfferRate = numberFromMcpValue(normalized.carrierOfferRate);
-  }
-
-  if ("agreedRate" in normalized) {
-    normalized.agreedRate = numberFromMcpValue(normalized.agreedRate);
-  }
-
-  if ("transferMock" in normalized) {
-    normalized.transferMock = booleanFromMcpValue(normalized.transferMock);
-  }
-
-  if (name === "finalize_call" && "extractedData" in normalized) {
-    normalized.extractedData = objectFromMcpValue(normalized.extractedData);
-    if (!isRecord(normalized.extractedData)) {
-      delete normalized.extractedData;
-    }
-  }
-
-  return normalized;
+function isMcpToolName(name: string): name is McpToolName {
+  return name in mcpToolHandlers;
 }
 
 export async function callMcpTool(services: AppServices, name: string, args: unknown) {
-  const normalizedArgs = normalizeMcpToolArgs(name, args);
-
-  switch (name) {
-    case "verify_carrier":
-      return services.carriers.verifyCarrier(VerifyCarrierRequestSchema.parse(normalizedArgs));
-    case "search_loads":
-      return services.loads.searchLoads(SearchLoadsRequestSchema.parse(normalizedArgs));
-    case "negotiate_offer":
-      return services.negotiations.negotiateOffer(NegotiateOfferRequestSchema.parse(normalizedArgs));
-    case "finalize_call":
-      return services.calls.finalizeCall(FinalizeCallRequestSchema.parse(normalizedArgs));
-    default:
-      throw new Error(`Unknown MCP tool: ${name}`);
+  if (!isMcpToolName(name)) {
+    throw new Error(`Unknown MCP tool: ${name}`);
   }
+
+  const normalizedArgs = normalizeMcpToolArgs(name, args);
+  return mcpToolHandlers[name](services, normalizedArgs);
 }

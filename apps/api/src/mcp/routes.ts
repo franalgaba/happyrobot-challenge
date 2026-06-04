@@ -1,13 +1,18 @@
-import { Hono } from "hono";
 import { McpServer, WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
+import type { JsonSchemaType, StandardSchemaWithJSON } from "@modelcontextprotocol/server";
+import { Hono } from "hono";
+
 import type { AppServices } from "../services/types";
 import { jsonError } from "../utils/http";
 import { logError } from "../utils/logging";
 import { callMcpTool, mcpTools } from "./tools";
-import type { JsonSchemaType, StandardSchemaWithJSON } from "@modelcontextprotocol/server";
 
 const MCP_SERVER_NAME = "happyrobot-carrier-sales-tools";
 const MCP_SERVER_VERSION = "0.1.0";
+const MCP_JSON_RESPONSE_ACCEPT_HEADER = "application/json, text/event-stream";
+const MCP_TOOL_FAILURE_MESSAGE = "MCP tool call failed.";
+
+type McpToolDefinition = (typeof mcpTools)[number];
 
 function mcpTokenIsValid(token: string, expectedToken: string) {
   return token === expectedToken;
@@ -34,7 +39,7 @@ function requestWithMcpAcceptHeader(request: Request) {
   }
 
   const headers = new Headers(request.headers);
-  headers.set("Accept", "application/json, text/event-stream");
+  headers.set("Accept", MCP_JSON_RESPONSE_ACCEPT_HEADER);
   return new Request(request, { headers });
 }
 
@@ -52,29 +57,37 @@ function passThroughMcpInputSchema(schema: JsonSchemaType): StandardSchemaWithJS
   };
 }
 
+function logMcpToolError(toolName: string, args: unknown, error: unknown) {
+  logError("mcp_tool_error", error, {
+    operation: "mcp_tool",
+    mcpToolName: toolName,
+    mcpArgKeys: safeMcpArgumentKeys(args),
+  });
+}
+
+function registerMcpTool(server: McpServer, services: AppServices, tool: McpToolDefinition) {
+  server.registerTool(
+    tool.name,
+    {
+      description: tool.description,
+      inputSchema: passThroughMcpInputSchema(tool.inputSchema as JsonSchemaType),
+    },
+    async (args) => {
+      try {
+        return toolCallResult(await callMcpTool(services, tool.name, args));
+      } catch (error) {
+        logMcpToolError(tool.name, args, error);
+        throw new Error(MCP_TOOL_FAILURE_MESSAGE);
+      }
+    },
+  );
+}
+
 function createSdkMcpServer(services: AppServices) {
   const server = new McpServer({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION });
 
   for (const tool of mcpTools) {
-    server.registerTool(
-      tool.name,
-      {
-        description: tool.description,
-        inputSchema: passThroughMcpInputSchema(tool.inputSchema as JsonSchemaType),
-      },
-      async (args) => {
-        try {
-          return toolCallResult(await callMcpTool(services, tool.name, args));
-        } catch (error) {
-          logError("mcp_tool_error", error, {
-            operation: "mcp_tool",
-            mcpToolName: tool.name,
-            mcpArgKeys: safeMcpArgumentKeys(args),
-          });
-          throw new Error("MCP tool call failed.");
-        }
-      },
-    );
+    registerMcpTool(server, services, tool);
   }
 
   return server;
