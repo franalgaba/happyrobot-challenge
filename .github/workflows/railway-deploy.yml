@@ -53,4 +53,13 @@ jobs:
         run: railway up --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT" --service api --ci
 
       - name: Deploy dashboard service
-        run: railway up --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT" --service dashboard --ci
+        run: |
+          tmp_config="$(mktemp)"
+          cp railway.json "$tmp_config"
+          restore_config() {
+            cp "$tmp_config" railway.json
+            rm -f "$tmp_config"
+          }
+          trap restore_config EXIT
+          cp apps/web/railway.json railway.json
+          railway up --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT" --service dashboard --ci

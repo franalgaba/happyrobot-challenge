@@ -4,7 +4,8 @@
     "builder": "DOCKERFILE"
   },
   "deploy": {
-    "startCommand": "bun run db:migrate && bun run db:seed && bun apps/api/dist/index.js",
+    "preDeployCommand": "bun run db:migrate && bun run db:seed",
+    "startCommand": "bun apps/api/dist/index.js",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE"

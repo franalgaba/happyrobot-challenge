@@ -140,4 +140,4 @@ bun run validate
 
 ## Deployment
 
-Pushes to `main` validate and deploy the API and dashboard services to Railway through GitHub Actions. See [docs/railway-deployment.md](docs/railway-deployment.md).
+Pushes to `main` validate and deploy the API and dashboard services to Railway through GitHub Actions. Railway runs API migrations and seed data as a pre-deploy step before starting the server. See [docs/railway-deployment.md](docs/railway-deployment.md).

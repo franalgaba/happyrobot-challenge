@@ -33,7 +33,7 @@ flowchart LR
   maintainer -->|TCP proxy for admin tasks| db
 ```
 
-The API is a Bun/Hono service built with the repository Dockerfile and Railway's `railway.json`. Public traffic enters through a Railway-provided HTTPS domain. The API connects to Postgres through Railway's private service network by using the `DATABASE_URL=${{Postgres.DATABASE_URL}}` reference variable. The API start command runs `bun run db:migrate` and `bun run db:seed` before starting the compiled server, so fresh demo deployments do not require separate database bootstrap commands.
+The API is a Bun/Hono service built with the repository Dockerfile and Railway's `railway.json`. Public traffic enters through a Railway-provided HTTPS domain. The API connects to Postgres through Railway's private service network by using the `DATABASE_URL=${{Postgres.DATABASE_URL}}` reference variable. Railway runs `bun run db:migrate && bun run db:seed` as a pre-deploy command, then starts the compiled server with `bun apps/api/dist/index.js`, so fresh demo deployments do not require separate database bootstrap commands.
 
 Postgres is a Railway managed database template service with persistent storage. For one-time admin tasks such as migrations and seed data, use the Railway TCP proxy or run commands from a Railway shell.
 
