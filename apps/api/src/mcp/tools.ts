@@ -45,21 +45,6 @@ export const mcpTools = [
   },
 ] as const;
 
-const DEMO_DEFAULTS = {
-  mcNumber: "123456",
-  origin: "Atlanta, GA",
-  destination: "Dallas, TX",
-  equipmentType: "Dry Van",
-  pickupDate: "2026-06-05",
-  limit: 3,
-  loadId: "HR-ATL-DAL-001",
-  sessionId: "happyrobot-demo-session",
-  carrierOfferRate: 2600,
-  outcome: "human_review",
-  sentiment: "neutral",
-  summary: "HappyRobot did not forward tool arguments to the MCP server; stored a demo fallback call record.",
-} as const;
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -129,39 +114,9 @@ function objectFromMcpValue(value: unknown) {
   }
 }
 
-function applyDemoFallbacks(name: string, args: Record<string, unknown>) {
-  if (name === "verify_carrier") {
-    args.mcNumber ??= DEMO_DEFAULTS.mcNumber;
-  }
-
-  if (name === "search_loads") {
-    args.origin ??= DEMO_DEFAULTS.origin;
-    args.destination ??= DEMO_DEFAULTS.destination;
-    args.equipmentType ??= DEMO_DEFAULTS.equipmentType;
-    args.pickupDate ??= DEMO_DEFAULTS.pickupDate;
-    args.limit ??= DEMO_DEFAULTS.limit;
-  }
-
-  if (name === "negotiate_offer") {
-    args.sessionId ??= DEMO_DEFAULTS.sessionId;
-    args.loadId ??= DEMO_DEFAULTS.loadId;
-    args.mcNumber ??= DEMO_DEFAULTS.mcNumber;
-    args.carrierOfferRate ??= DEMO_DEFAULTS.carrierOfferRate;
-  }
-
-  if (name === "finalize_call") {
-    args.mcNumber ??= DEMO_DEFAULTS.mcNumber;
-    args.outcome ??= DEMO_DEFAULTS.outcome;
-    args.sentiment ??= DEMO_DEFAULTS.sentiment;
-    args.summary ??= DEMO_DEFAULTS.summary;
-  }
-
-  return args;
-}
-
 function normalizeMcpToolArgs(name: string, args: unknown) {
   if (!isRecord(args)) {
-    return applyDemoFallbacks(name, {});
+    return args;
   }
 
   const normalized = stripEmptyOptionalValues({ ...args });
@@ -171,8 +126,6 @@ function normalizeMcpToolArgs(name: string, args: unknown) {
       normalized.mcNumber = mcNumber;
     }
   }
-
-  applyDemoFallbacks(name, normalized);
 
   if ("limit" in normalized) {
     normalized.limit = numberFromMcpValue(normalized.limit);
