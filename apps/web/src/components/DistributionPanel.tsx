@@ -13,7 +13,8 @@ type DistributionPanelProps = {
 };
 
 function panelClassName(className?: string): string {
-  return className ? `panel ${className}` : "panel";
+  const base = "panel panel--contain";
+  return className ? `${base} ${className}` : base;
 }
 
 export function DistributionPanel({
@@ -33,7 +34,7 @@ export function DistributionPanel({
       </header>
       <div className="panel-body">
         {entries.length === 0 ? (
-          <p className="kpi-hint">No data yet—run a demo call to populate metrics.</p>
+          <p className="kpi-hint">No activity yet—complete a carrier call to populate this chart.</p>
         ) : (
           <ul className="dist-list">
             {entries.map(([key, count]) => (
@@ -60,7 +61,7 @@ type DistributionRowProps = {
 };
 
 function DistributionRow({ count, label, swatchColor, total }: DistributionRowProps) {
-  const barWidthPercent = total > 0 ? (count / total) * 100 : 0;
+  const barScale = total > 0 ? count / total : 0;
   const displayPercent = sharePercent(count, total);
 
   return (
@@ -77,7 +78,7 @@ function DistributionRow({ count, label, swatchColor, total }: DistributionRowPr
         </span>
       </div>
       <div className="dist-track" aria-hidden>
-        <div className="dist-fill" style={{ width: `${barWidthPercent}%` }} />
+        <div className="dist-fill" style={{ transform: `scaleX(${barScale})` }} />
       </div>
     </li>
   );

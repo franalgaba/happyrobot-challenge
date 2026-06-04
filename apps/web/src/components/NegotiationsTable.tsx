@@ -18,9 +18,9 @@ export function NegotiationsTable({ negotiations }: NegotiationsTableProps) {
       subtitle="Per-session offer history and current status"
       isEmpty={negotiations.length === 0}
       emptyTitle="No negotiations yet"
-      emptyBody="Counter-offers during a call will appear here."
+      emptyBody="Rate discussions during a carrier call will appear here once offers are exchanged."
     >
-      <table className="data-table">
+      <table className="data-table data-table--stack">
         <thead>
           <tr>
             <th>Updated</th>
@@ -36,22 +36,32 @@ export function NegotiationsTable({ negotiations }: NegotiationsTableProps) {
         <tbody>
           {negotiations.map((negotiation) => (
             <tr key={negotiation.id}>
-              <td className="mono">{formatDateTime(negotiation.updatedAt)}</td>
-              <td className="mono">{negotiation.loadId}</td>
-              <td className="mono">{negotiation.mcNumber}</td>
-              <td>
-                <AnimatedNumber className="mono" value={negotiation.roundCount} format={INTEGER_FORMAT} />
+              <td className="mono" data-label="Updated">
+                {formatDateTime(negotiation.updatedAt)}
               </td>
-              <td>
+              <td className="mono" data-label="Load">
+                {negotiation.loadId}
+              </td>
+              <td className="mono" data-label="MC">
+                {negotiation.mcNumber}
+              </td>
+              <td data-label="Rounds">
+                <AnimatedNumber
+                  className="mono"
+                  value={negotiation.roundCount}
+                  format={INTEGER_FORMAT}
+                />
+              </td>
+              <td data-label="Status">
                 <Badge value={negotiation.status} />
               </td>
-              <td>
+              <td data-label="Last offer">
                 <AnimatedMoney value={negotiation.lastOfferRate} />
               </td>
-              <td>
+              <td data-label="Last counter">
                 <AnimatedMoney value={negotiation.lastCounterRate} />
               </td>
-              <td>
+              <td data-label="Agreed">
                 <AnimatedMoney value={negotiation.agreedRate} />
               </td>
             </tr>

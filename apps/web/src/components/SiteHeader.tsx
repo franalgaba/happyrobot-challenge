@@ -25,7 +25,6 @@ export function SiteHeader({
         <HappyRobotLogo theme={theme} className="brand-logo" />
         <span className="brand-client">
           <span className="brand-client-name">{clientName}</span>
-          <span className="brand-client-role">Inbound carrier sales</span>
         </span>
       </a>
       <div className="header-meta">

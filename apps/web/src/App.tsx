@@ -1,10 +1,12 @@
 import { CallsTable } from "./components/CallsTable";
+import { DemoCallLauncher } from "./components/DemoCallLauncher";
 import { DashboardLoading } from "./components/DashboardLoading";
 import { DashboardSummary } from "./components/DashboardSummary";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { LoadsTable } from "./components/LoadsTable";
 import { NegotiationsTable } from "./components/NegotiationsTable";
 import { SiteHeader } from "./components/SiteHeader";
+import { DashboardMotionProvider } from "./context/dashboard-motion";
 import { useDashboardData } from "./hooks/useDashboardData";
 import { resolveConnectionStatus } from "./lib/connection-status";
 import { useTheme } from "./theme";
@@ -24,13 +26,14 @@ export function App() {
 
   const showLoading = loading && data == null;
   const showTables = data != null;
+  const subtleNumbers = refreshing && data != null;
 
   function handleRetry() {
     void refetch();
   }
 
   return (
-    <>
+    <DashboardMotionProvider subtleNumbers={subtleNumbers}>
       <a className="skip-link" href="#dashboard-main">
         Skip to metrics
       </a>
@@ -44,15 +47,16 @@ export function App() {
       />
 
       <main id="dashboard-main" className="dashboard" tabIndex={-1}>
-        <section className="hero hr-enter" aria-labelledby="dashboard-title">
-          <div className="hero-inner">
+        <div className="page-intro hr-enter">
+          <section className="intro-card" aria-labelledby="dashboard-title">
             <h1 id="dashboard-title">Inbound carrier sales</h1>
-            <p className="hero-lede">
-              Automated carrier calls for {CLIENT_NAME}—verification, load matching, negotiation,
-              and finalized outcomes.
+            <p className="page-intro-lede">
+              Operations view for {CLIENT_NAME}—finalized calls, negotiation outcomes, and load
+              coverage in one place.
             </p>
-          </div>
-        </section>
+          </section>
+          <DemoCallLauncher onCallEnded={refetch} />
+        </div>
 
         {error ? (
           <ErrorBanner message={error} onRetry={handleRetry} retrying={refreshing} />
@@ -75,8 +79,8 @@ export function App() {
         <span>
           Powered by <strong>HappyRobot</strong> · Built for {CLIENT_NAME}
         </span>
-        <span>Inbound carrier sales POC · Metrics from custom reporting API</span>
+        <span>Operations reporting · Live metrics from your API</span>
       </footer>
-    </>
+    </DashboardMotionProvider>
   );
 }

@@ -8,7 +8,7 @@ import {
   ValidationError,
   HappyRobotClient,
 } from "@happyrobot-ai/sdk";
-import type { VoiceTokenRequest } from "@happyrobot-challenge/shared";
+import { VoiceTokenResponseSchema, type VoiceTokenRequest } from "@happyrobot-challenge/shared";
 import type { RuntimeConfig } from "../env/config";
 import type { VoiceService } from "./types";
 
@@ -103,12 +103,14 @@ export function createVoiceService(config: RuntimeConfig): VoiceService {
         happyrobotCluster: config.happyrobotCluster,
       });
 
-      return client.voice.createToken({
+      const token = await client.voice.createToken({
         workflow_id: workflowId,
         data: input.data,
         env: input.environment ?? config.happyrobotEnvironment,
         ttl_seconds: input.ttlSeconds,
       });
+
+      return VoiceTokenResponseSchema.parse(token);
     },
   };
 }

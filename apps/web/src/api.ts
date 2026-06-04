@@ -1,15 +1,45 @@
-import type {
-  CallsReportResponse,
-  DashboardData,
-  LoadsReportResponse,
-  NegotiationsReportResponse,
-  ReportSummary,
-} from "@happyrobot-challenge/shared";
+import type { DashboardData } from "@happyrobot-challenge/shared";
+
+type ErrorResponseBody = {
+  message?: unknown;
+  error?: unknown;
+};
+
+type StructuredError = {
+  message?: unknown;
+  requestId?: unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function structuredErrorMessage(error: StructuredError): string | null {
+  const message = stringValue(error.message);
+  if (!message) return null;
+
+  const requestId = stringValue(error.requestId);
+  return requestId ? `${message} (request ${requestId})` : message;
+}
+
+function errorMessageFromJson(json: ErrorResponseBody): string | null {
+  const topLevelMessage = stringValue(json.message);
+  if (topLevelMessage) return topLevelMessage;
+
+  const error = json.error;
+  if (typeof error === "string") return error;
+  if (isRecord(error)) return structuredErrorMessage(error);
+
+  return null;
+}
 
 function errorDetailFromJson(body: string) {
   try {
-    const json = JSON.parse(body) as { message?: string; error?: string };
-    return json.message ?? json.error ?? body;
+    return errorMessageFromJson(JSON.parse(body) as ErrorResponseBody) ?? body;
   } catch {
     return body;
   }
@@ -37,17 +67,5 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 export async function fetchDashboardData(): Promise<DashboardData> {
-  const [summary, calls, loads, negotiations] = await Promise.all([
-    getJson<ReportSummary>("/api/reports/summary"),
-    getJson<CallsReportResponse>("/api/reports/calls"),
-    getJson<LoadsReportResponse>("/api/reports/loads"),
-    getJson<NegotiationsReportResponse>("/api/reports/negotiations"),
-  ]);
-
-  return {
-    summary,
-    calls: calls.data,
-    loads: loads.data,
-    negotiations: negotiations.data,
-  };
+  return getJson<DashboardData>("/api/reports/dashboard");
 }

@@ -39,6 +39,7 @@ function callRecord(row: typeof calls.$inferSelect): CallRecord {
     sentiment: row.sentiment as CallRecord["sentiment"],
     agreedRate: toNumber(row.agreedRate),
     summary: row.summary,
+    extractedData: row.extractedData,
     transferMock: row.transferMock,
     createdAt: iso(row.createdAt),
   };

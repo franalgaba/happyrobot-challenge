@@ -7,6 +7,30 @@ const DEFAULT_DRY_RUN_WORKFLOW_ID = "dry-run-workflow-id";
 const DEFAULT_HAPPYROBOT_ENVIRONMENT = "production";
 const MCP_SERVER_NAME = "Carrier Sales Hono MCP";
 const WORKFLOW_DESCRIPTION = "Inbound carrier load sales POC backed by Hono tools and Postgres.";
+const DEFAULT_MODEL = { type: "static", static: { id: "turbo-one", name: "gpt-4.1" } } as const;
+const DEFAULT_VOICE = { type: "static", static: { id: "m357hexpjk2s", name: "Paul" } } as const;
+const DEFAULT_LANGUAGE = { type: "static", static: { id: "en", name: "English" } } as const;
+const DEFAULT_LANGUAGE_ACCENT = { type: "static", static: { id: "en-us", name: "English (US)" } } as const;
+const MCP_INTEGRATION_ID = "019d4a7a-f3e9-7470-a7cc-dd4c7ad6376e";
+const MCP_CALL_EVENT_ID = "019d4a7a-f3e9-7748-b002-efb988800cd3";
+const TOOL_DEFINITIONS = [
+  {
+    name: "verify_carrier",
+    description: "Use this tool after the caller gives an MC number and before discussing load details. It verifies carrier eligibility.",
+  },
+  {
+    name: "search_loads",
+    description: "Use this tool after the carrier describes lane, equipment, or pickup preferences. It finds matching active loads.",
+  },
+  {
+    name: "negotiate_offer",
+    description: "Use this tool whenever the carrier makes a rate offer or counteroffer. It decides whether to accept, counter, or reject.",
+  },
+  {
+    name: "finalize_call",
+    description: "Use this tool before ending every call to persist the outcome, sentiment, summary, and extracted carrier/load details.",
+  },
+] as const;
 
 type SyncOptions = {
   dryRun: boolean;
@@ -46,6 +70,26 @@ type McpServerPayload = {
   auth_type: "none";
 };
 
+type WorkflowNode = {
+  id?: string;
+  name?: string;
+  type?: string;
+  parent_id?: string | null;
+  sort_index?: number;
+  event_id?: string;
+  integration_id?: string;
+  configuration?: Record<string, unknown>;
+  function?: unknown;
+};
+
+type WorkflowVersion = {
+  id?: string;
+  is_published?: boolean;
+  is_live?: boolean;
+  is_locked?: boolean;
+  version_number?: number;
+};
+
 function hasFlag(flag: string) {
   return process.argv.includes(flag);
 }
@@ -60,6 +104,10 @@ function requiredEnv(name: string) {
 
 function mcpUrl(apiBaseUrl: string, token: string) {
   return `${apiBaseUrl.replace(/\/$/, "")}/mcp/${token}`;
+}
+
+function redactMcpUrl(url: string) {
+  return url.replace(/\/mcp\/[^/?#]+/, "/mcp/<redacted>");
 }
 
 function happyRobotCluster() {
@@ -120,15 +168,264 @@ async function findWorkflowByName(client: HappyRobotClient, name: string) {
   return null;
 }
 
-async function inspectEditableNodes(client: HappyRobotClient, workflowId: string) {
+function versionNeedsFork(version: WorkflowVersion) {
+  return Boolean(version.is_live || version.is_published || version.is_locked);
+}
+
+function forkedVersionId(forked: unknown) {
+  const candidate = forked as { id?: string; data?: { id?: string }; version?: { id?: string } };
+  return candidate.id ?? candidate.data?.id ?? candidate.version?.id;
+}
+
+async function editableVersion(client: HappyRobotClient, workflowId: string) {
   const versions = await client.workflows.listVersions(workflowId);
-  const latestVersion = versions.data[0];
+  const latestVersion = versions.data[0] as WorkflowVersion | undefined;
   if (!latestVersion?.id) {
-    return { latestVersion: null, nodes: [] as unknown[] };
+    return null;
   }
 
-  const nodes = await client.nodes.list(latestVersion.id);
-  return { latestVersion, nodes: Array.isArray(nodes) ? nodes : (nodes as { data?: unknown[] }).data ?? [] };
+  if (!versionNeedsFork(latestVersion)) {
+    return latestVersion;
+  }
+
+  const forked = await client.versions.fork(latestVersion.id);
+  const id = forkedVersionId(forked);
+  if (!id) {
+    throw new Error(`HappyRobot did not return an ID after forking version ${latestVersion.id}.`);
+  }
+  console.log(`Forked locked/live version ${latestVersion.id} into editable version ${id}`);
+  return { ...latestVersion, id, is_published: false, is_live: false, is_locked: false };
+}
+
+async function inspectWorkflowNodes(client: HappyRobotClient, versionId: string) {
+  const nodes = await client.nodes.list(versionId);
+  return (Array.isArray(nodes) ? nodes : (nodes as { data?: WorkflowNode[] }).data ?? []) as WorkflowNode[];
+}
+
+async function listVersionNodes(client: HappyRobotClient, versionId: string) {
+  return inspectWorkflowNodes(client, versionId);
+}
+
+async function inspectEditableNodes(client: HappyRobotClient, workflowId: string) {
+  const latestVersion = await editableVersion(client, workflowId);
+  if (!latestVersion?.id) {
+    return { latestVersion: null, nodes: [] as WorkflowNode[] };
+  }
+
+  const nodes = await inspectWorkflowNodes(client, latestVersion.id);
+  return { latestVersion, nodes };
+}
+
+async function inspectLatestNodes(client: HappyRobotClient, versionId: string) {
+  return { latestVersion: { id: versionId }, nodes: await inspectWorkflowNodes(client, versionId) };
+}
+
+function paragraph(text: string) {
+  return [{ type: "paragraph", children: [{ text }] }];
+}
+
+function emptyToolMessage() {
+  return {
+    type: "none",
+    example: "",
+    description: [],
+  };
+}
+
+function nodeName(node: WorkflowNode) {
+  return node.name?.toLowerCase() ?? "";
+}
+
+function findRequiredNode(nodes: WorkflowNode[], description: string, predicate: (node: WorkflowNode) => boolean) {
+  const node = nodes.find(predicate);
+  if (!node?.id) {
+    throw new Error(`Could not find ${description} node in the latest workflow version.`);
+  }
+  return node;
+}
+
+async function configurePromptNode(client: HappyRobotClient, versionId: string, node: WorkflowNode, prompt: string) {
+  await client.nodes.update(versionId, node.id!, {
+    type: "prompt",
+    name: node.name ?? "Prompt",
+    parent_id: node.parent_id ?? null,
+    sort_index: node.sort_index ?? -1,
+    prompt_md: prompt,
+    initial_message: INITIAL_MESSAGE,
+    model: DEFAULT_MODEL,
+  });
+  console.log(`Configured prompt node ${node.id}`);
+}
+
+async function configureVoiceAgentNode(client: HappyRobotClient, versionId: string, node: WorkflowNode, webCallNode: WorkflowNode) {
+  await client.nodes.update(versionId, node.id!, {
+    type: "action",
+    name: node.name ?? "Inbound Voice Agent",
+    parent_id: node.parent_id ?? null,
+    sort_index: node.sort_index ?? 0,
+    event_id: node.event_id,
+    integration_id: node.integration_id,
+    configuration: {
+      ...node.configuration,
+      call: {
+        type: "static",
+        static: {
+          id: webCallNode.id,
+          name: webCallNode.name ?? "Web Call",
+        },
+      },
+      agent: {
+        name: paragraph(WORKFLOW_NAME),
+        voices: [DEFAULT_VOICE],
+        languages: [DEFAULT_LANGUAGE],
+        language_accents: [DEFAULT_LANGUAGE_ACCENT],
+      },
+      business_hours_setting_name: "default",
+    },
+  });
+  console.log(`Configured inbound voice agent node ${node.id}`);
+}
+
+function mcpCallConfiguration(toolName: string, credentialId: string) {
+  return {
+    credentialId,
+    tool_name: toolName,
+    tool_args: [],
+    dynamic_headers: [],
+  };
+}
+
+async function upsertToolNode(
+  client: HappyRobotClient,
+  versionId: string,
+  promptNode: WorkflowNode,
+  tool: (typeof TOOL_DEFINITIONS)[number],
+  sortIndex: number,
+) {
+  const nodes = await listVersionNodes(client, versionId);
+  const existing = nodes.find((node) => node.type === "tool" && node.name === tool.name && node.parent_id === promptNode.id);
+  const body = {
+    type: "tool",
+    name: tool.name,
+    parent_id: promptNode.id,
+    sort_index: sortIndex,
+    function: {
+      description: paragraph(tool.description),
+      message: emptyToolMessage(),
+    },
+  };
+
+  if (existing?.id) {
+    await client.nodes.update(versionId, existing.id, body);
+    console.log(`Configured tool node ${existing.id} (${tool.name})`);
+    return { ...existing, ...body };
+  }
+
+  const created = await client.nodes.addBatch(versionId, {
+    nodes: [
+      {
+        type: "tool",
+        name: tool.name,
+        parent_node_id: promptNode.id,
+        sort_index: sortIndex,
+        configuration: {},
+      },
+    ],
+  });
+  const createdNode = (created as { data?: WorkflowNode[] }).data?.[0];
+  if (!createdNode?.id) {
+    throw new Error(`HappyRobot did not return an ID for created tool node ${tool.name}.`);
+  }
+  await client.nodes.update(versionId, createdNode.id, body);
+  console.log(`Created and configured tool node ${createdNode.id} (${tool.name})`);
+  return { ...createdNode, ...body };
+}
+
+async function upsertMcpCallNode(
+  client: HappyRobotClient,
+  versionId: string,
+  toolNode: WorkflowNode,
+  tool: (typeof TOOL_DEFINITIONS)[number],
+  credentialId: string,
+) {
+  if (!toolNode.id) {
+    throw new Error(`Cannot configure MCP Call for ${tool.name} because the tool node has no ID.`);
+  }
+
+  const nodes = await listVersionNodes(client, versionId);
+  const existing = nodes.find(
+    (node) =>
+      node.type === "action" &&
+      node.parent_id === toolNode.id &&
+      (node.event_id === MCP_CALL_EVENT_ID || node.integration_id === MCP_INTEGRATION_ID || nodeName(node) === "mcp call"),
+  );
+  const body = {
+    type: "action",
+    name: "MCP Call",
+    parent_id: toolNode.id,
+    sort_index: 0,
+    event_id: MCP_CALL_EVENT_ID,
+    integration_id: MCP_INTEGRATION_ID,
+    configuration: mcpCallConfiguration(tool.name, credentialId),
+  };
+
+  if (existing?.id) {
+    await client.nodes.update(versionId, existing.id, body);
+    console.log(`Configured MCP Call node ${existing.id} (${tool.name})`);
+    return;
+  }
+
+  const created = await client.nodes.addBatch(versionId, {
+    nodes: [
+      {
+        type: "action",
+        name: "MCP Call",
+        parent_node_id: toolNode.id,
+        sort_index: 0,
+        event_id: MCP_CALL_EVENT_ID,
+        integration_id: MCP_INTEGRATION_ID,
+        configuration: mcpCallConfiguration(tool.name, credentialId),
+      },
+    ],
+  });
+  const createdNode = (created as { data?: WorkflowNode[] }).data?.[0];
+  if (!createdNode?.id) {
+    throw new Error(`HappyRobot did not return an ID for created MCP Call node ${tool.name}.`);
+  }
+  await client.nodes.update(versionId, createdNode.id, body);
+  console.log(`Created and configured MCP Call node ${createdNode.id} (${tool.name})`);
+}
+
+async function configureToolNodes(client: HappyRobotClient, versionId: string, promptNode: WorkflowNode, credentialId: string) {
+  for (const [index, tool] of TOOL_DEFINITIONS.entries()) {
+    const toolNode = await upsertToolNode(client, versionId, promptNode, tool, index);
+    await upsertMcpCallNode(client, versionId, toolNode, tool, credentialId);
+  }
+}
+
+async function configureWorkflowNodes(client: HappyRobotClient, workflowId: string, prompt: string, mcpCredentialId: string) {
+  const inspection = await inspectEditableNodes(client, workflowId);
+  if (!inspection.latestVersion?.id) {
+    throw new Error(`Workflow ${workflowId} does not have an editable version.`);
+  }
+
+  const webCallNode = findRequiredNode(
+    inspection.nodes,
+    "Web Call",
+    (node) => nodeName(node) === "web call" || nodeName(node) === "web call trigger",
+  );
+  const promptNode = findRequiredNode(inspection.nodes, "Prompt", (node) => node.type === "prompt" || nodeName(node) === "prompt");
+  const voiceNode = findRequiredNode(
+    inspection.nodes,
+    "Inbound Voice Agent",
+    (node) => nodeName(node) === "inbound voice agent",
+  );
+
+  await configurePromptNode(client, inspection.latestVersion.id, promptNode, prompt);
+  await configureVoiceAgentNode(client, inspection.latestVersion.id, voiceNode, webCallNode);
+  await configureToolNodes(client, inspection.latestVersion.id, promptNode, mcpCredentialId);
+
+  return inspectLatestNodes(client, inspection.latestVersion.id);
 }
 
 function mcpPayload(url: string): McpServerPayload {
@@ -167,6 +464,21 @@ async function registerMcp(client: HappyRobotClient, url: string, dryRun: boolea
   }
 
   return server;
+}
+
+async function publishVersion(client: HappyRobotClient, workflowId: string, versionId: string) {
+  try {
+    await client.versions.publish(versionId, { environment: happyRobotEnvironment() });
+  } catch (error) {
+    const message = describeSdkError(error);
+    if (!message.includes("already has a live version")) {
+      throw error;
+    }
+
+    await client.workflows.unpublish(workflowId);
+    await client.versions.publish(versionId, { environment: happyRobotEnvironment() });
+  }
+  console.log(`Published workflow ${workflowId} version ${versionId}`);
 }
 
 async function authenticateClient(client: HappyRobotClient) {
@@ -223,14 +535,12 @@ function printManualFallback(input: {
   console.log("\nManual Builder fallback");
   console.log("-----------------------");
   console.log(`Workflow: ${input.workflowName} (${input.workflowId})`);
-  console.log(`MCP URL: ${input.mcpUrl}`);
+  console.log(`MCP URL: ${redactMcpUrl(input.mcpUrl)}`);
   console.log(`API base URL: ${input.apiBaseUrl}`);
   console.log("1. Open the workflow in HappyRobot Builder.");
-  console.log("2. Confirm it has a Web Call trigger node and the inbound carrier sales prompt.");
-  console.log("3. Attach the registered MCP server named \"Carrier Sales Hono MCP\".");
-  console.log("4. Enable tools: verify_carrier, search_loads, negotiate_offer, finalize_call.");
-  console.log("5. Publish the workflow after a test call succeeds.");
-  console.log("6. Store the published workflow ID in HAPPYROBOT_WORKFLOW_ID.");
+  console.log("2. Confirm it has Web Call -> Inbound Voice Agent -> Prompt -> tool nodes.");
+  console.log("3. Confirm the registered MCP server named \"Carrier Sales Hono MCP\" is attached to the tool nodes.");
+  console.log("4. Store the published workflow ID in HAPPYROBOT_WORKFLOW_ID.");
   console.log(`Discovered node count: ${input.nodes.length}`);
 }
 
@@ -255,25 +565,35 @@ async function main(options: SyncOptions) {
     await upsertVariable(client, workflow.id, name, value, options.dryRun);
   }
 
-  await registerMcp(client, url, options.dryRun);
+  const mcpServer = await registerMcp(client, url, options.dryRun);
+  const mcpCredentialId = mcpServer ? mcpServerId(mcpServer as McpServer) : undefined;
 
   let nodes: unknown[] = [];
+  let configuredVersionId: string | undefined;
   if (!options.dryRun) {
+    if (!mcpCredentialId) {
+      throw new Error("Cannot configure MCP Call nodes because the registered MCP server did not return a credential ID.");
+    }
     try {
-      const inspection = await inspectEditableNodes(client, workflow.id);
+      const inspection = await configureWorkflowNodes(client, workflow.id, prompt, mcpCredentialId);
       nodes = inspection.nodes;
       if (inspection.latestVersion?.id) {
+        configuredVersionId = inspection.latestVersion.id;
         console.log(`Latest version: ${inspection.latestVersion.id}`);
-        console.log(`Inspected ${nodes.length} workflow nodes for manual verification.`);
+        console.log(`Configured and inspected ${nodes.length} workflow nodes.`);
       }
     } catch (error) {
-      console.log(`Node inspection skipped: ${describeSdkError(error)}`);
+      console.log(`Node configuration skipped: ${describeSdkError(error)}`);
     }
+  } else {
+    console.log("Would configure Prompt, Inbound Voice Agent, tool nodes, and child MCP Call nodes from the latest workflow version.");
   }
 
   if (options.publish && !options.dryRun) {
-    await client.workflows.publish(workflow.id);
-    console.log(`Published workflow ${workflow.id}`);
+    if (!configuredVersionId) {
+      throw new Error("Cannot publish because node configuration did not return a version ID.");
+    }
+    await publishVersion(client, workflow.id, configuredVersionId);
   }
 
   printManualFallback({

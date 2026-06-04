@@ -10,6 +10,7 @@ import {
   SearchLoadsRequestSchema,
   VerifyCarrierRequestSchema,
   VoiceTokenRequestSchema,
+  VoiceTokenResponseSchema,
 } from "@happyrobot-challenge/shared";
 import type { z } from "zod";
 import { mapHappyRobotError } from "../services/happyrobot";
@@ -156,7 +157,7 @@ export function createApiRoutes(services: AppServices) {
 
   api.post("/voice/token", jsonValidator(VoiceTokenRequestSchema), async (c) => {
     try {
-      return c.json(await services.voice.createToken(c.req.valid("json")));
+      return c.json(VoiceTokenResponseSchema.parse(await services.voice.createToken(c.req.valid("json"))));
     } catch (error) {
       const mapped = mapHappyRobotError(error);
       logHappyRobotTokenError(c, error, mapped);

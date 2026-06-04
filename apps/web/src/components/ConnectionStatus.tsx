@@ -11,11 +11,22 @@ const STATUS_COPY: Record<ConnectionStatus, string> = {
   error: "Unavailable",
 };
 
+const STATUS_ARIA: Record<ConnectionStatus, string> = {
+  live: "Dashboard connection live",
+  loading: "Dashboard connecting",
+  syncing: "Dashboard syncing latest metrics",
+  error: "Dashboard connection unavailable",
+};
+
 export function ConnectionStatusPill({ status }: ConnectionStatusProps) {
   return (
-    <span className={`live-pill live-pill--${status}`} role="status">
+    <span
+      className={`live-pill live-pill--${status}`}
+      role="status"
+      aria-label={STATUS_ARIA[status]}
+    >
       <span className="live-dot" aria-hidden />
-      {STATUS_COPY[status]}
+      <span aria-hidden>{STATUS_COPY[status]}</span>
     </span>
   );
 }

@@ -29,7 +29,7 @@ export function ReportTableSection({
         <h2 id={headingId}>{title}</h2>
         <p>{subtitle}</p>
       </header>
-      <div className={bodyClassName}>
+      <div className={`${bodyClassName} report-section-scroll`}>
         {isEmpty ? (
           <div className="empty-state">
             <strong>{emptyTitle}</strong>

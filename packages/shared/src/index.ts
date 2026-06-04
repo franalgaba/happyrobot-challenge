@@ -133,6 +133,13 @@ export const VoiceTokenRequestSchema = z.object({
   ttlSeconds: z.number().int().min(60).max(86400).optional(),
 });
 
+export const VoiceTokenResponseSchema = z.object({
+  url: z.string().url(),
+  token: z.string().min(1),
+  room_name: z.string().min(1),
+  run_id: z.string().min(1),
+});
+
 export const ReportSummarySchema = z.object({
   totalCalls: z.number().int(),
   byOutcome: z.record(z.number().int()),
@@ -161,6 +168,7 @@ export const CallRecordSchema = z.object({
   sentiment: SentimentSchema,
   agreedRate: z.number().nullable(),
   summary: z.string().nullable(),
+  extractedData: z.record(z.unknown()),
   transferMock: z.boolean(),
   createdAt: z.string().datetime(),
 });
@@ -225,6 +233,7 @@ export type NegotiateOfferResponse = z.infer<typeof NegotiateOfferResponseSchema
 export type FinalizeCallRequest = z.infer<typeof FinalizeCallRequestSchema>;
 export type FinalizeCallResponse = z.infer<typeof FinalizeCallResponseSchema>;
 export type VoiceTokenRequest = z.infer<typeof VoiceTokenRequestSchema>;
+export type VoiceTokenResponse = z.infer<typeof VoiceTokenResponseSchema>;
 export type CallOutcome = z.infer<typeof CallOutcomeSchema>;
 export type Sentiment = z.infer<typeof SentimentSchema>;
 export type ReportSummary = z.infer<typeof ReportSummarySchema>;

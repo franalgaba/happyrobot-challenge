@@ -1,4 +1,5 @@
 import NumberFlow, { type NumberFlowProps } from "@number-flow/react";
+import { useSubtleNumberAnimation } from "../context/dashboard-motion";
 import { NUMBER_FLOW_TIMINGS } from "../lib/number-flow";
 
 type AnimatedNumberProps = {
@@ -16,6 +17,8 @@ export function AnimatedNumber({
   prefix,
   suffix,
 }: AnimatedNumberProps) {
+  const subtle = useSubtleNumberAnimation();
+
   return (
     <NumberFlow
       className={className}
@@ -24,6 +27,7 @@ export function AnimatedNumber({
       format={format}
       prefix={prefix}
       suffix={suffix}
+      animated={!subtle}
       {...NUMBER_FLOW_TIMINGS}
     />
   );

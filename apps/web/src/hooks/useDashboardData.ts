@@ -17,9 +17,11 @@ export function useDashboardData(): DashboardQueryState {
   const query = useQuery({
     queryKey: DASHBOARD_QUERY_KEY,
     queryFn: fetchDashboardData,
-    refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,
+    refetchInterval: (dashboardQuery) =>
+      dashboardQuery.state.error ? false : DASHBOARD_REFETCH_INTERVAL_MS,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    retry: false,
   });
 
   const errorMessage =

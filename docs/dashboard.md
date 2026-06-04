@@ -43,26 +43,28 @@ Data refreshes automatically every 30 seconds (TanStack Query), and also when yo
 
 ## API Integration
 
-Browser requests go to the dashboard server on the same origin. The dashboard server proxies these read-only report endpoints to the API and injects `X-API-Key` server-side:
+Browser requests go to the dashboard **BFF** on the same origin (`apps/web/bff`). The BFF injects `X-API-Key` server-side; the browser never receives it.
 
 ```text
-GET /api/reports/summary
-GET /api/reports/calls
-GET /api/reports/loads
-GET /api/reports/negotiations
+GET  /api/reports/dashboard   # aggregate payload for the UI
+POST /api/voice/token         # Web Call room + LiveKit token (demo launcher)
 ```
 
-The browser must be allowed by the API `CORS_ORIGINS` setting. Default local origins:
+Upstream API routes (called by the BFF only):
 
 ```text
-http://localhost:5173
-http://localhost:4173
-http://localhost:8080
+GET  /api/reports/summary
+GET  /api/reports/calls
+GET  /api/reports/loads
+GET  /api/reports/negotiations
+POST /api/voice/token
 ```
+
+CORS to the public API is not required for normal dashboard use. The hero **Start demo call** button uses `@happyrobot-ai/sdk/voice` + `livekit-client` against HappyRobot LiveKit (`connect-src` is set in the BFF CSP).
 
 ## Environment Variables
 
-Set in `apps/web/.env.local` for Vite dev, or as Railway / Docker **runtime** variables for production. The dashboard server uses these values to proxy report requests to the API without exposing the API key to browser code.
+Set in `apps/web/.env.local` for Vite dev, or as Railway / Docker **runtime** variables for production. Only the BFF reads `API_BASE_URL` and `API_KEY`—do not use `VITE_*` for API secrets.
 
 | Variable | Required | Description |
 | --- | --- | --- |
@@ -93,8 +95,16 @@ On the **API** service:
    VITE_CLIENT_NAME=Acme Logistics
    ```
 
-3. Ensure API `CORS_ORIGINS` includes `http://localhost:5173` (see root `.env.example`).
-4. Run:
+   **Against the public API from local Vite** (no local API process):
+
+   ```text
+   API_BASE_URL=https://<api-service>.up.railway.app
+   API_KEY=<same as API_KEY on Railway API>
+   ```
+
+   The Vite dev server runs the same BFF middleware as `server.mjs` (`apps/web/lib/bff-proxy.mjs`): browser → `localhost:5173/api/reports/*` → upstream API with `X-API-Key` on the server. You can also set `PUBLIC_API_BASE_URL` in the repo root `.env` instead of `API_BASE_URL` in `apps/web/.env.local`.
+
+3. Run:
 
    ```bash
    bun install

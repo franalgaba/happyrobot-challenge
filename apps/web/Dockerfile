@@ -18,13 +18,15 @@ ENV VITE_CLIENT_NAME=${VITE_CLIENT_NAME}
 RUN bun --filter @happyrobot-challenge/web build
 
 FROM oven/bun:1.3.11 AS runner
-WORKDIR /app/apps/web
+WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV API_BASE_URL=http://api.railway.internal:3000
 
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/web/dist ./dist
+COPY --from=builder /app/apps/web/bff ./bff
 COPY --from=builder /app/apps/web/server.mjs ./server.mjs
 
 EXPOSE 8080

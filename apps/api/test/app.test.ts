@@ -148,6 +148,34 @@ describe("Hono API", () => {
     await expect(response.json()).resolves.toMatchObject({ eligible: true, simulated: true });
   });
 
+  it("creates a HappyRobot Web Call token through the API route", async () => {
+    const createToken = vi.fn(async () => ({
+      url: "wss://livekit.platform.happyrobot.ai",
+      token: "scoped-livekit-token",
+      room_name: "workflow_webcall_room",
+      run_id: "run-1",
+    }));
+    const response = await postJson(
+      "/api/voice/token",
+      { workflowId: "workflow-1", environment: "production", data: { demo: true }, ttlSeconds: 3600 },
+      { voice: { createToken } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(createToken).toHaveBeenCalledWith({
+      workflowId: "workflow-1",
+      environment: "production",
+      data: { demo: true },
+      ttlSeconds: 3600,
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      url: "wss://livekit.platform.happyrobot.ai",
+      token: "scoped-livekit-token",
+      room_name: "workflow_webcall_room",
+      run_id: "run-1",
+    });
+  });
+
   it("maps unavailable HappyRobot voice token errors", async () => {
     const response = await postJson("/api/voice/token", { workflowId: "wf" }, {
       voice: {

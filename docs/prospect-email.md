@@ -6,13 +6,17 @@ Hi Carlos,
 
 Ahead of our meeting, I wanted to send a short update on the inbound carrier sales POC.
 
-The build can now take a carrier from "I am calling about loads" to a qualified load conversation. The agent asks for the MC number, checks whether the carrier can work with the broker, searches the available loads, pitches a matching option, and handles rate counters within broker-set limits.
+The POC is now ready to show how a brokerage could handle inbound carrier calls without making a rep qualify every carrier, search every load, and manage every first counteroffer manually.
 
-I focused the POC on the decisions a broker would care about during an inbound call: who is allowed to book, what load should be offered, how far the agent can move on price, and when the call should move to a sales rep. The transfer step is mocked for Web Call, using the required confirmation message once a rate is agreed.
+In the current flow, a carrier calls in, gives their MC number, gets checked for eligibility, hears a matching load, and can negotiate within pricing limits set by the broker. If the rate lands inside those limits, the agent moves the call toward sales handoff. Since the demo uses Web Call, the transfer is represented with the required confirmation message.
 
-I also built broker-owned reporting outside of HappyRobot analytics. It records call outcomes, sentiment, carrier eligibility, negotiation status, agreed rates, and the call/load/offer details a sales or ops manager would need after the call.
+I also added broker-owned reporting outside of HappyRobot analytics, so the team can see what happened after the call: which carriers were qualified, which loads were pitched, where negotiations ended, what rates were agreed, and how the carrier interaction was classified.
 
-For the demo, I will walk through one inbound carrier call, show how the pricing guardrails work, and show the reporting data produced after the call. I will also have the deployed API, code repository, and HappyRobot workflow ready for review.
+You can review the live dashboard here before the meeting: https://dashboard-production-f259.up.railway.app/
+
+The code repository is also available here for technical review: https://github.com/franalgaba/happyrobot-challenge
+
+In the demo, I will focus on the broker workflow: reducing manual call handling, keeping pricing control with the brokerage, and giving the team useful post-call visibility. I will send the short recording separately once it is ready.
 
 Best,
 Franalgaba

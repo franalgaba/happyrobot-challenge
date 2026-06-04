@@ -17,9 +17,9 @@ export function LoadsTable({ loads }: LoadsTableProps) {
       subtitle={`${activeLoads.length} loads available for matching`}
       isEmpty={activeLoads.length === 0}
       emptyTitle="No active loads"
-      emptyBody="Seed the database or check load status in the API."
+      emptyBody="Active freight ready for carrier matching will show up here."
     >
-      <table className="data-table">
+      <table className="data-table data-table--stack">
         <thead>
           <tr>
             <th>Load ID</th>
@@ -34,19 +34,23 @@ export function LoadsTable({ loads }: LoadsTableProps) {
         <tbody>
           {activeLoads.map((load) => (
             <tr key={load.loadId}>
-              <td className="mono">{load.loadId}</td>
-              <td>
+              <td className="mono" data-label="Load ID">
+                {load.loadId}
+              </td>
+              <td data-label="Lane">
                 {load.origin} → {load.destination}
               </td>
-              <td>{load.equipmentType}</td>
-              <td className="mono">{formatDateTime(load.pickupDatetime)}</td>
-              <td>
+              <td data-label="Equipment">{load.equipmentType}</td>
+              <td className="mono" data-label="Pickup">
+                {formatDateTime(load.pickupDatetime)}
+              </td>
+              <td data-label="Board">
                 <AnimatedMoney value={load.loadboardRate} />
               </td>
-              <td>
+              <td data-label="Target">
                 <AnimatedMoney value={load.targetRate} />
               </td>
-              <td>
+              <td data-label="Max auto">
                 <AnimatedMoney value={load.maxAutoRate} />
               </td>
             </tr>

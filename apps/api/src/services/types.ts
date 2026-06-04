@@ -12,6 +12,7 @@ import type {
   VerifyCarrierRequest,
   VerifyCarrierResponse,
   VoiceTokenRequest,
+  VoiceTokenResponse,
 } from "@happyrobot-challenge/shared";
 
 export interface CarrierService {
@@ -38,7 +39,7 @@ export interface ReportService {
 }
 
 export interface VoiceService {
-  createToken(input: VoiceTokenRequest): Promise<unknown>;
+  createToken(input: VoiceTokenRequest): Promise<VoiceTokenResponse>;
 }
 
 export interface AppServices {

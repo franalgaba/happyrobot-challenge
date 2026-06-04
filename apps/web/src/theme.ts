@@ -1,11 +1,12 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { THEME_META_COLOR } from "./lib/theme-meta";
 
 export type Theme = "light" | "dark";
 
 const STORAGE_KEY = "hr-dashboard-theme";
 const THEME_COLOR: Record<Theme, string> = {
-  light: "#fafafb",
-  dark: "#0f0f10",
+  light: THEME_META_COLOR.light,
+  dark: THEME_META_COLOR.dark,
 };
 const listeners = new Set<() => void>();
 
