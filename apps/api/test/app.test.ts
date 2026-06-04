@@ -318,6 +318,22 @@ describe("Hono API", () => {
     expect(verifyCarrier).toHaveBeenCalledWith({ mcNumber: "123456" });
   });
 
+  it("uses demo defaults when HappyRobot drops MCP tool arguments", async () => {
+    const verifyCarrier = vi.fn(services().carriers.verifyCarrier);
+    const response = await postMcp(
+      {
+        jsonrpc: "2.0",
+        id: 7,
+        method: "tools/call",
+        params: { name: "verify_carrier", arguments: {} },
+      },
+      { carriers: { verifyCarrier } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(verifyCarrier).toHaveBeenCalledWith({ mcNumber: "123456" });
+  });
+
   it("normalizes templated string values for numeric MCP arguments", async () => {
     const negotiateOffer = vi.fn(services().negotiations.negotiateOffer);
     const response = await postMcp(
@@ -383,6 +399,48 @@ describe("Hono API", () => {
       sentiment: "neutral",
       summary: "Carrier verification failed due to a system issue.",
       extractedData: { carrier: { mcNumber: "123456" } },
+    });
+  });
+
+  it("uses demo defaults for missing negotiation MCP arguments", async () => {
+    const negotiateOffer = vi.fn(services().negotiations.negotiateOffer);
+    const response = await postMcp(
+      {
+        jsonrpc: "2.0",
+        id: 8,
+        method: "tools/call",
+        params: { name: "negotiate_offer", arguments: {} },
+      },
+      { negotiations: { negotiateOffer } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(negotiateOffer).toHaveBeenCalledWith({
+      sessionId: "happyrobot-demo-session",
+      loadId: "HR-ATL-DAL-001",
+      mcNumber: "123456",
+      carrierOfferRate: 2600,
+    });
+  });
+
+  it("uses demo defaults for missing finalization MCP arguments", async () => {
+    const finalizeCall = vi.fn(services().calls.finalizeCall);
+    const response = await postMcp(
+      {
+        jsonrpc: "2.0",
+        id: 9,
+        method: "tools/call",
+        params: { name: "finalize_call", arguments: {} },
+      },
+      { calls: { finalizeCall } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(finalizeCall).toHaveBeenCalledWith({
+      mcNumber: "123456",
+      outcome: "human_review",
+      sentiment: "neutral",
+      summary: "HappyRobot did not forward tool arguments to the MCP server; stored a demo fallback call record.",
     });
   });
 });

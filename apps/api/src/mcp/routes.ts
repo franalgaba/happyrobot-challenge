@@ -68,6 +68,11 @@ function toolCallResult(result: unknown) {
   };
 }
 
+function safeMcpArgumentKeys(body: JsonRpcRequest | undefined) {
+  const args = body?.params?.arguments;
+  return typeof args === "object" && args !== null && !Array.isArray(args) ? Object.keys(args) : [];
+}
+
 async function handleJsonRpcRequest(services: AppServices, body: JsonRpcRequest, requestId: string) {
   if (body.method === "initialize") {
     return jsonRpcResult(body.id, initializeResult());
@@ -117,6 +122,8 @@ export function createMcpRoutes(services: AppServices, mcpPathToken: string) {
         operation: "mcp_json_rpc",
         rpcMethod: body?.method,
         rpcId: body?.id,
+        mcpToolName: body?.params?.name,
+        mcpArgKeys: safeMcpArgumentKeys(body),
       });
 
       if (error instanceof SyntaxError) {
