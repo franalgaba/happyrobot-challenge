@@ -3,7 +3,7 @@ import type { VerifyCarrierRequest, VerifyCarrierResponse } from "@happyrobot-ch
 import type { Db } from "../db/client";
 import { carriers } from "../db/schema";
 import type { RuntimeConfig } from "../env/config";
-import { invalidRequest } from "../utils/errors";
+import { invalidRequest, serviceUnavailable } from "../utils/errors";
 import { normalizeMcNumber } from "../utils/http";
 import type { CarrierService } from "./types";
 
@@ -105,7 +105,16 @@ function toCarrierResponse(input: CarrierResponseInput): VerifyCarrierResponse {
   };
 }
 
-export function createCarrierService(db: Db, config: Pick<RuntimeConfig, "fmcsaWebKey">): CarrierService {
+export function createCarrierService(
+  db: Db,
+  config: Pick<RuntimeConfig, "allowSeededCarrierFallback" | "demoCarrierMcNumbers" | "fmcsaWebKey">,
+): CarrierService {
+  const demoCarrierMcNumbers = new Set(config.demoCarrierMcNumbers.map(normalizeMcNumber).filter(Boolean));
+
+  function allowsSeededFallback(mcNumber: string) {
+    return config.allowSeededCarrierFallback || demoCarrierMcNumbers.has(mcNumber);
+  }
+
   async function storeCarrier(input: StoredCarrierInput) {
     const updatedAt = new Date();
     const [record] = await db
@@ -222,9 +231,20 @@ export function createCarrierService(db: Db, config: Pick<RuntimeConfig, "fmcsaW
         liveResult = await verifyWithFmcsa(mcNumber);
       } catch (error) {
         console.warn(error instanceof Error ? error.message : "FMCSA lookup failed.");
+        if (!allowsSeededFallback(mcNumber)) {
+          throw serviceUnavailable("FMCSA carrier verification is unavailable.", "fmcsa_unavailable");
+        }
       }
 
-      return liveResult ?? verifyFromSeed(mcNumber);
+      if (liveResult) {
+        return liveResult;
+      }
+
+      if (!allowsSeededFallback(mcNumber)) {
+        throw serviceUnavailable("FMCSA carrier verification did not return a carrier.", "fmcsa_carrier_not_found");
+      }
+
+      return verifyFromSeed(mcNumber);
     },
   };
 }

@@ -33,6 +33,9 @@ bun run dev:down
    - `API_KEY`
    - `MCP_PATH_TOKEN`
    - `PUBLIC_API_BASE_URL`
+   - `FMCSA_WEB_KEY` for live FMCSA verification in production-like runs
+
+   Local demos may use seeded carrier fallback with `ALLOW_SEEDED_CARRIER_FALLBACK=true`. Production uses live FMCSA for real MCs, while `DEMO_CARRIER_MC_NUMBERS` keeps scripted demo MCs such as `123456` available from seeded data if FMCSA is unavailable.
 2. Start Postgres (or the full Docker stack):
    ```bash
    docker compose up postgres

@@ -57,9 +57,14 @@ PUBLIC_API_BASE_URL=https://<api-service>.up.railway.app
 HAPPYROBOT_API_KEY=<server-only HappyRobot key>
 HAPPYROBOT_CLUSTER=us
 HAPPYROBOT_ENVIRONMENT=production
-FMCSA_WEB_KEY=<optional FMCSA WebKey>
+FMCSA_WEB_KEY=<FMCSA WebKey required for production>
+DEMO_CARRIER_MC_NUMBERS=123456,654321,777888
+# Optional only for demo environments without FMCSA access:
+# ALLOW_SEEDED_CARRIER_FALLBACK=true
 CORS_ORIGINS=https://<dashboard-service>.up.railway.app,http://localhost:5173,http://localhost:4173
 ```
+
+The API uses live FMCSA for non-demo MCs. If `FMCSA_WEB_KEY` is missing, only MCs in `DEMO_CARRIER_MC_NUMBERS` can use seeded data; other MCs fail verification instead of silently falling back. Use `ALLOW_SEEDED_CARRIER_FALLBACK=true` only for broad local/POC demos where every seeded carrier can be accepted.
 
 Set the `dashboard` service variables. `API_BASE_URL` and `API_KEY` are runtime server variables used by the dashboard proxy; `VITE_CLIENT_NAME` is read at build time by Vite.
 

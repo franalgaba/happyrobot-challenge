@@ -48,11 +48,11 @@ The proof of concept has three main parts:
 
 1. The carrier starts a Web Call with the HappyRobot inbound voice workflow.
 2. The agent asks for an MC number.
-3. The backend verifies carrier eligibility through FMCSA when an `FMCSA_WEB_KEY` is configured, or seeded fallback data during local demos.
+3. The backend verifies carrier eligibility through FMCSA for real MCs. Scripted demo MCs such as `123456` can use seeded data if FMCSA is unavailable, keeping the POC demo reliable.
 4. Eligible carriers are matched to active loads by lane, equipment type, and pickup timing.
 5. The agent pitches the best load and asks whether the carrier wants it.
 6. If the carrier counters, the negotiation tool applies per-load target and max rates for up to three rounds.
-7. If a rate is accepted, the agent says: “Transfer was successful and now you can wrap up the conversation.”
+7. If a rate is accepted, the negotiation tool returns a carrier-facing booking confirmation and the agent wraps up naturally.
 8. The call is finalized with extracted fields, outcome classification, sentiment, transcript, and summary.
 
 ## Load Matching
@@ -129,7 +129,9 @@ Required environment variables:
 - `HAPPYROBOT_API_KEY`
 - `HAPPYROBOT_CLUSTER`
 - `HAPPYROBOT_ENVIRONMENT`
-- `FMCSA_WEB_KEY` when live FMCSA verification is available
+- `FMCSA_WEB_KEY` for live FMCSA verification
+- `DEMO_CARRIER_MC_NUMBERS=123456,654321,777888` for scripted seeded demo MCs
+- `ALLOW_SEEDED_CARRIER_FALLBACK=true` only for local/POC seeded fallback demos
 
 Deployment reproduction steps are documented in `docs/railway-deployment.md`.
 

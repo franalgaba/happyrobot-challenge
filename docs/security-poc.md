@@ -50,8 +50,10 @@ FMCSA QCMobile lookups use a `webKey` query parameter in the request URL. The cu
 
 Current POC handling:
 
-- `FMCSA_WEB_KEY` is optional.
-- If FMCSA is unavailable, carrier verification falls back to seeded data and marks the response as simulated.
+- Live FMCSA is used for non-demo MCs when `FMCSA_WEB_KEY` is configured.
+- `DEMO_CARRIER_MC_NUMBERS` allows scripted demo MCs such as `123456` to use seeded data if FMCSA is unavailable.
+- `ALLOW_SEEDED_CARRIER_FALLBACK=true` enables broad seeded fallback and should be limited to local/POC demos.
+- If seeded fallback is not allowed for an MC, FMCSA lookup failures fail carrier verification instead of silently using demo data.
 - The key must be stored only in environment variables and never committed.
 
 Before production:
