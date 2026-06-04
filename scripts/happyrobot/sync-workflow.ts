@@ -337,6 +337,18 @@ async function findWorkflowByName(client: HappyRobotClient, name: string) {
   return null;
 }
 
+async function findWorkflowById(client: HappyRobotClient, workflowId: string) {
+  try {
+    return await client.workflows.get(workflowId);
+  } catch (error) {
+    const message = describeSdkError(error);
+    if (message.includes("404") || message.toLowerCase().includes("not found")) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 function versionNeedsFork(version: WorkflowVersion) {
   return Boolean(version.is_live || version.is_published || version.is_locked);
 }
@@ -688,33 +700,56 @@ async function createWorkflow(client: HappyRobotClient, prompt: string): Promise
     publish: false,
     environment: happyRobotEnvironment(),
   });
+  await client.workflows.update(created.workflow.id, {
+    name: WORKFLOW_NAME,
+    description: WORKFLOW_DESCRIPTION,
+  });
   console.log(`Created workflow ${created.workflow.id}`);
   return created.workflow;
 }
 
-async function updateWorkflow(client: HappyRobotClient, workflow: WorkflowReference) {
-  console.log(`Using existing workflow ${workflow.id}`);
-  await client.workflows.update(workflow.id, {
-    name: WORKFLOW_NAME,
-    description: WORKFLOW_DESCRIPTION,
-  });
+async function ignoreWorkflowCleanupError(action: string, workflow: WorkflowReference, error: unknown) {
+  const message = describeSdkError(error);
+  if (message.includes("404") || message.toLowerCase().includes("not found")) {
+    return;
+  }
+  console.log(`Could not ${action} workflow ${workflow.id} before deletion: ${message}`);
+}
+
+async function deleteWorkflow(client: HappyRobotClient, workflow: WorkflowReference) {
+  console.log(`Deleting existing workflow ${workflow.id} (${workflow.name}) before recreating it.`);
+
+  try {
+    await client.workflows.cancelRuns(workflow.id);
+  } catch (error) {
+    await ignoreWorkflowCleanupError("cancel runs for", workflow, error);
+  }
+
+  try {
+    await client.workflows.unpublish(workflow.id);
+  } catch (error) {
+    await ignoreWorkflowCleanupError("unpublish", workflow, error);
+  }
+
+  await client.workflows.delete(workflow.id);
+  console.log(`Deleted workflow ${workflow.id}`);
 }
 
 async function resolveWorkflow(client: HappyRobotClient, prompt: string): Promise<WorkflowReference> {
   const workflowId = process.env.HAPPYROBOT_WORKFLOW_ID;
-  const existing = workflowId ? await client.workflows.get(workflowId) : await findWorkflowByName(client, WORKFLOW_NAME);
+  const existing = workflowId ? await findWorkflowById(client, workflowId) : await findWorkflowByName(client, WORKFLOW_NAME);
 
-  if (!existing) {
-    return createWorkflow(client, prompt);
+  if (existing) {
+    await deleteWorkflow(client, existing as WorkflowReference);
+  } else if (workflowId) {
+    console.log(`Workflow ${workflowId} was not found; creating a replacement workflow.`);
   }
 
-  const workflow = existing as WorkflowReference;
-  await updateWorkflow(client, workflow);
-  return workflow;
+  return createWorkflow(client, prompt);
 }
 
 function dryRunWorkflow(): WorkflowReference {
-  console.log(`Would create or update inbound voice workflow "${WORKFLOW_NAME}" from template.`);
+  console.log(`Would delete the existing inbound voice workflow if present, then create "${WORKFLOW_NAME}" from template.`);
   return { id: process.env.HAPPYROBOT_WORKFLOW_ID ?? DEFAULT_DRY_RUN_WORKFLOW_ID, name: WORKFLOW_NAME };
 }
 
@@ -733,7 +768,7 @@ function printManualFallback(input: {
   console.log("1. Open the workflow in HappyRobot Builder.");
   console.log("2. Confirm it has Web Call -> Inbound Voice Agent -> Prompt -> tool nodes.");
   console.log("3. Confirm the registered MCP server named \"Carrier Sales Hono MCP\" is attached to the tool nodes.");
-  console.log("4. Store the published workflow ID in HAPPYROBOT_WORKFLOW_ID.");
+  console.log(`4. Store this new workflow ID in HAPPYROBOT_WORKFLOW_ID: ${input.workflowId}`);
   console.log(`Discovered node count: ${input.nodes.length}`);
 }
 
