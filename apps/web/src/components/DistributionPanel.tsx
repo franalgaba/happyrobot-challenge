@@ -1,6 +1,4 @@
-import { sharePercent } from "../lib/format";
-import { INTEGER_FORMAT } from "../lib/number-flow";
-import { AnimatedNumber } from "./AnimatedNumber";
+import { DistributionList } from "./DistributionList";
 
 type DistributionPanelProps = {
   title: string;
@@ -33,53 +31,14 @@ export function DistributionPanel({
         <p>{subtitle}</p>
       </header>
       <div className="panel-body">
-        {entries.length === 0 ? (
-          <p className="kpi-hint">No activity yet—complete a carrier call to populate this chart.</p>
-        ) : (
-          <ul className="dist-list">
-            {entries.map(([key, count]) => (
-              <DistributionRow
-                key={key}
-                count={count}
-                label={labels[key] ?? key}
-                swatchColor={colors[key] ?? "var(--hr-fg)"}
-                total={total}
-              />
-            ))}
-          </ul>
-        )}
+        <DistributionList
+          entries={entries}
+          total={total}
+          colors={colors}
+          labels={labels}
+          emptyMessage="No activity yet—complete a carrier call to populate this chart."
+        />
       </div>
     </article>
-  );
-}
-
-type DistributionRowProps = {
-  count: number;
-  label: string;
-  swatchColor: string;
-  total: number;
-};
-
-function DistributionRow({ count, label, swatchColor, total }: DistributionRowProps) {
-  const barScale = total > 0 ? count / total : 0;
-  const displayPercent = sharePercent(count, total);
-
-  return (
-    <li className="dist-row">
-      <div className="dist-meta">
-        <span className="dist-label">
-          <span className="dist-swatch" style={{ background: swatchColor }} aria-hidden />
-          {label}
-        </span>
-        <span className="mono dist-meta-counts">
-          <AnimatedNumber value={count} format={INTEGER_FORMAT} />
-          <span aria-hidden> · </span>
-          <AnimatedNumber value={displayPercent} suffix="%" format={INTEGER_FORMAT} />
-        </span>
-      </div>
-      <div className="dist-track" aria-hidden>
-        <div className="dist-fill" style={{ transform: `scaleX(${barScale})` }} />
-      </div>
-    </li>
   );
 }

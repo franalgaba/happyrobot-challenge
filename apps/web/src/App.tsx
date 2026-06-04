@@ -1,10 +1,11 @@
-import { CallsTable } from "./components/CallsTable";
+import { CallsWorkSection } from "./components/CallsWorkSection";
+import { CollapsibleBoard } from "./components/CollapsibleBoard";
 import { DemoCallLauncher } from "./components/DemoCallLauncher";
 import { DashboardLoading } from "./components/DashboardLoading";
-import { DashboardSummary } from "./components/DashboardSummary";
+import { DashboardOverview } from "./components/DashboardOverview";
 import { ErrorBanner } from "./components/ErrorBanner";
-import { LoadsTable } from "./components/LoadsTable";
-import { NegotiationsTable } from "./components/NegotiationsTable";
+import { LoadsBoard } from "./components/LoadsBoard";
+import { NegotiationsBoard } from "./components/NegotiationsBoard";
 import { SiteHeader } from "./components/SiteHeader";
 import { DashboardMotionProvider } from "./context/dashboard-motion";
 import { useDashboardData } from "./hooks/useDashboardData";
@@ -25,8 +26,9 @@ export function App() {
   });
 
   const showLoading = loading && data == null;
-  const showTables = data != null;
+  const showWork = data != null;
   const subtleNumbers = refreshing && data != null;
+  const activeLoadCount = data?.loads.filter((load) => load.active).length ?? 0;
 
   function handleRetry() {
     void refetch();
@@ -51,8 +53,8 @@ export function App() {
           <section className="intro-card" aria-labelledby="dashboard-title">
             <h1 id="dashboard-title">Inbound carrier sales</h1>
             <p className="page-intro-lede">
-              Operations view for {CLIENT_NAME}—finalized calls, negotiation outcomes, and load
-              coverage in one place.
+              Operations view for {CLIENT_NAME}—booking performance, call outcomes, and auditable
+              carrier conversations.
             </p>
           </section>
           <DemoCallLauncher onCallEnded={refetch} />
@@ -64,14 +66,32 @@ export function App() {
 
         {showLoading ? <DashboardLoading /> : null}
 
-        {data?.summary ? <DashboardSummary summary={data.summary} /> : null}
+        {data?.summary ? <DashboardOverview summary={data.summary} /> : null}
 
-        {showTables ? (
-          <>
-            <CallsTable calls={data.calls} />
-            <LoadsTable loads={data.loads} />
-            <NegotiationsTable negotiations={data.negotiations} />
-          </>
+        {showWork ? (
+          <div className="dashboard-work">
+            <CallsWorkSection
+              calls={data.calls}
+              loads={data.loads}
+              negotiations={data.negotiations}
+            />
+            <CollapsibleBoard
+              id="loads-board"
+              title="Active loads"
+              count={activeLoadCount}
+              hint="Coverage available for matching"
+            >
+              <LoadsBoard loads={data.loads} />
+            </CollapsibleBoard>
+            <CollapsibleBoard
+              id="negotiations-board"
+              title="All negotiations"
+              count={data.negotiations.length}
+              hint="Full offer history across sessions"
+            >
+              <NegotiationsBoard negotiations={data.negotiations} />
+            </CollapsibleBoard>
+          </div>
         ) : null}
       </main>
 

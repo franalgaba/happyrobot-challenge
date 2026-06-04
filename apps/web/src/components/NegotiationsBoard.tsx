@@ -4,22 +4,23 @@ import { AnimatedMoney } from "./AnimatedMoney";
 import { AnimatedNumber } from "./AnimatedNumber";
 import type { NegotiationRecord } from "@happyrobot-challenge/shared";
 import { Badge } from "./Badge";
-import { ReportTableSection } from "./ReportTableSection";
 
-type NegotiationsTableProps = {
+type NegotiationsBoardProps = {
   negotiations: NegotiationRecord[];
 };
 
-export function NegotiationsTable({ negotiations }: NegotiationsTableProps) {
+export function NegotiationsBoard({ negotiations }: NegotiationsBoardProps) {
+  if (negotiations.length === 0) {
+    return (
+      <div className="collapsible-board-empty">
+        <strong>No negotiations yet</strong>
+        <p>Rate discussions during a carrier call will appear here once offers are exchanged.</p>
+      </div>
+    );
+  }
+
   return (
-    <ReportTableSection
-      headingId="negotiations-heading"
-      title="Negotiations"
-      subtitle="Per-session offer history and current status"
-      isEmpty={negotiations.length === 0}
-      emptyTitle="No negotiations yet"
-      emptyBody="Rate discussions during a carrier call will appear here once offers are exchanged."
-    >
+    <div className="report-section-scroll">
       <table className="data-table data-table--stack">
         <thead>
           <tr>
@@ -53,7 +54,7 @@ export function NegotiationsTable({ negotiations }: NegotiationsTableProps) {
                 />
               </td>
               <td data-label="Status">
-                <Badge value={negotiation.status} />
+                <Badge kind="negotiation" value={negotiation.status} />
               </td>
               <td data-label="Last offer">
                 <AnimatedMoney value={negotiation.lastOfferRate} />
@@ -68,6 +69,6 @@ export function NegotiationsTable({ negotiations }: NegotiationsTableProps) {
           ))}
         </tbody>
       </table>
-    </ReportTableSection>
+    </div>
   );
 }

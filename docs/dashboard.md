@@ -19,25 +19,23 @@ The dashboard reads the custom reporting API only. It does not configure workflo
 
 ## What It Shows
 
-### Summary (top of page)
+### Pulse (top of page)
 
-- Total finalized calls
-- Booked count and book rate
-- Average agreed rate
-- Negotiation totals (accepted / countered / rejected)
+- **Booking rate** — primary hero metric (% of finalized calls that booked)
+- **Total calls** and **avg. agreed rate**
+- **Outcome stack** — single bar + legend for where conversations ended
 
-### Distributions
+### Diagnostics (collapsed by default)
 
-- **Call outcomes** — `booked`, `rejected`, `no_match`, `ineligible`, `transferred`, `follow_up`, `human_review`
-- **Carrier sentiment** — `positive`, `neutral`, `negative`, `mixed`
-- **Carrier verification** — live FMCSA vs seeded fallback
-- **Negotiation policy** — accepted / countered / rejected counts
+- **Carrier sentiment** distribution
+- **Negotiation policy** — accepted / countered / rejected and close rate
+- **Carrier verification** — live FMCSA vs demo seed (trust / demo detail)
 
-### Tables
+### Work
 
-- **Recent calls** — MC, load, outcome, sentiment, agreed rate, summary
-- **Active loads** — lane, equipment, rates (board / target / max auto)
-- **Negotiations** — rounds, status, last offer/counter, agreed rate
+- **Calls** — Recent vs **Needs review** (follow-up, human review, negative sentiment); lane, outcome, agreed rate; expand row for sentiment, negotiation, full summary
+- **Active loads** (collapsed) — lane, equipment, rate band
+- **All negotiations** (collapsed) — full offer history
 
 Data refreshes automatically every 30 seconds (TanStack Query), and also when you return to the tab or regain network connectivity.
 

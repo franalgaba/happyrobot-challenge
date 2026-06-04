@@ -1,24 +1,25 @@
 import { formatDateTime } from "../lib/format";
 import { AnimatedMoney } from "./AnimatedMoney";
 import type { LoadRecord } from "@happyrobot-challenge/shared";
-import { ReportTableSection } from "./ReportTableSection";
 
-type LoadsTableProps = {
+type LoadsBoardProps = {
   loads: LoadRecord[];
 };
 
-export function LoadsTable({ loads }: LoadsTableProps) {
+export function LoadsBoard({ loads }: LoadsBoardProps) {
   const activeLoads = loads.filter((load) => load.active);
 
+  if (activeLoads.length === 0) {
+    return (
+      <div className="collapsible-board-empty">
+        <strong>No active loads</strong>
+        <p>Active freight ready for carrier matching will show up here.</p>
+      </div>
+    );
+  }
+
   return (
-    <ReportTableSection
-      headingId="loads-heading"
-      title="Active loads"
-      subtitle={`${activeLoads.length} loads available for matching`}
-      isEmpty={activeLoads.length === 0}
-      emptyTitle="No active loads"
-      emptyBody="Active freight ready for carrier matching will show up here."
-    >
+    <div className="report-section-scroll">
       <table className="data-table data-table--stack">
         <thead>
           <tr>
@@ -57,6 +58,6 @@ export function LoadsTable({ loads }: LoadsTableProps) {
           ))}
         </tbody>
       </table>
-    </ReportTableSection>
+    </div>
   );
 }

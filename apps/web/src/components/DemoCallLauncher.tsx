@@ -6,15 +6,53 @@ import { fetchVoiceToken } from "../lib/voice-token";
 
 type CallStatus = "idle" | "connecting" | "connected" | "error";
 
+type DemoScriptStep = {
+  label: string;
+  value?: string;
+  detail?: string;
+};
+
+const DEMO_SCRIPT_STEPS: DemoScriptStep[] = [
+  { label: "MC number", value: "123456" },
+  { label: "Lane", detail: "Atlanta → Dallas dry van" },
+  { label: "Counter", value: "$2,600" },
+  { label: "Close", detail: "Accept the counter, then wrap up after transfer" },
+];
+
 type DemoCallLauncherProps = {
   onCallEnded?: () => void;
 };
+
+function DemoCallScript() {
+  return (
+    <div className="demo-call-script">
+      <p className="demo-call-script-label">What to say</p>
+      <ol className="demo-script-steps">
+        {DEMO_SCRIPT_STEPS.map((step, index) => (
+          <li key={step.label} className="demo-script-step">
+            <span className="demo-script-step-num" aria-hidden>
+              {index + 1}
+            </span>
+            <div className="demo-script-step-body">
+              <span className="demo-script-step-label">{step.label}</span>
+              {step.value ? (
+                <span className="demo-script-step-value mono">{step.value}</span>
+              ) : null}
+              {step.detail ? (
+                <span className="demo-script-step-detail">{step.detail}</span>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
   const connectionRef = useRef<VoiceConnection | null>(null);
   const [status, setStatus] = useState<CallStatus>("idle");
   const [muted, setMuted] = useState(false);
-  const [runId, setRunId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function startCall() {
@@ -23,7 +61,6 @@ export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
 
     try {
       const tokenResponse: VoiceTokenResponse = await fetchVoiceToken();
-      setRunId(tokenResponse.run_id);
 
       const voiceConfig = {
         url: tokenResponse.url,
@@ -90,72 +127,64 @@ export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
 
   return (
     <aside className="demo-call" aria-label="Live demo call">
-      <p className="demo-call-eyebrow">Live demonstration</p>
+      <p className="demo-call-script-label demo-call-eyebrow">Live demonstration</p>
+
+      {isConnecting && !isConnected ? (
+        <p className="demo-call-status" role="status" aria-live="polite">
+          Connecting to agent…
+        </p>
+      ) : null}
 
       {isConnected ? (
         <>
-          <p className="demo-call-status demo-call-status--live" role="status">
+          <p className="demo-call-status demo-call-status--live" role="status" aria-live="polite">
             <span className="demo-call-live-dot" aria-hidden />
-            In call
-            {runId ? (
-              <>
-                {" "}
-                · <span className="mono">Run {runId}</span>
-              </>
-            ) : null}
+            Live with carrier agent
           </p>
-          <div className="demo-call-controls">
-            <div className="demo-call-actions">
-              <button
-                type="button"
-                className="demo-call-btn demo-call-btn--secondary"
-                onClick={toggleMute}
-              >
-                {muted ? "Unmute" : "Mute"}
-              </button>
-              <button type="button" className="demo-call-btn demo-call-btn--primary" onClick={endCall}>
-                End call
-              </button>
-            </div>
-          </div>
+          <p className="demo-call-hint">End the call when finished—metrics refresh automatically.</p>
         </>
-      ) : (
+      ) : null}
+
+      {!isConnected && !isConnecting ? (
         <>
           <p className="demo-call-hint">
-            Talk to the inbound carrier agent in your browser—metrics below update when the call
-            ends.
+            Talk to the inbound carrier agent in your browser. Metrics update when the call ends.
           </p>
-          <div className="demo-call-controls">
+          {status === "error" && errorMessage ? (
+            <p className="demo-call-error" role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+
+      <DemoCallScript />
+
+      <div className="demo-call-controls">
+        {isConnected ? (
+          <div className="demo-call-actions">
             <button
               type="button"
-              className="demo-call-btn demo-call-btn--primary"
-              onClick={startCall}
-              disabled={isConnecting}
+              className="demo-call-btn demo-call-btn--secondary"
+              onClick={toggleMute}
             >
-              {isConnecting ? "Connecting…" : "Start demo call"}
+              {muted ? "Unmute" : "Mute"}
             </button>
-            {status === "error" && errorMessage ? (
-              <p className="demo-call-error" role="alert">
-                {errorMessage}
-              </p>
-            ) : null}
+            <button type="button" className="demo-call-btn demo-call-btn--primary" onClick={endCall}>
+              End call
+            </button>
           </div>
-        </>
-      )}
-
-      <details className="demo-call-script">
-        <summary>Demo script</summary>
-        <ol>
-          <li>
-            MC number: <span className="mono">123456</span>
-          </li>
-          <li>Lane: Atlanta to Dallas dry van</li>
-          <li>
-            Counter: <span className="mono">$2600</span>
-          </li>
-          <li>Accept the counter, then wrap up after a successful transfer</li>
-        </ol>
-      </details>
+        ) : (
+          <button
+            type="button"
+            className="demo-call-btn demo-call-btn--primary"
+            onClick={startCall}
+            disabled={isConnecting}
+          >
+            {isConnecting ? "Connecting…" : "Start demo call"}
+          </button>
+        )}
+      </div>
     </aside>
   );
 }

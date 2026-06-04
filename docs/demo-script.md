@@ -51,7 +51,7 @@ Open the operations dashboard (local Vite, Docker Compose on port 8080, or deplo
 
 Walk through:
 
-- KPI row (calls, booked, avg agreed rate, negotiations)
-- Outcome and sentiment breakdowns
-- Recent calls table with the demo call you just finalized
-- Active loads and any negotiation rows from the counter-offer flow
+- Pulse (booking rate, outcome stack)
+- Expand diagnostics if needed (sentiment, negotiation policy)
+- Recent calls tab with the demo call you just finalized (expand row for negotiation detail)
+- Active loads and all negotiations (collapsed sections)
