@@ -685,7 +685,7 @@ async function registerMcp(client: HappyRobotClient, url: string, dryRun: boolea
   const { data } = await client.mcp.list();
   const matches = (data as McpServer[]).filter((server) => mcpServerMatchesUrl(server, url) && mcpServerName(server) === MCP_SERVER_NAME);
   const existing = newestMcpServer(matches);
-  if (matches.length > 1) {
+  if (existing && matches.length > 1) {
     console.log(`Found ${matches.length} MCP server registrations for ${redactMcpUrl(url)}; using newest ${mcpServerId(existing)}.`);
   }
   const server = existing ?? (await client.mcp.create(mcpPayload(url)));
