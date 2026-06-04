@@ -347,4 +347,42 @@ describe("Hono API", () => {
       carrierOfferRate: 2600,
     });
   });
+
+  it("drops unresolved optional MCP template values", async () => {
+    const finalizeCall = vi.fn(services().calls.finalizeCall);
+    const response = await postMcp(
+      {
+        jsonrpc: "2.0",
+        id: 6,
+        method: "tools/call",
+        params: {
+          name: "finalize_call",
+          arguments: {
+            happyrobotRunId: "@happyrobotRunId",
+            happyrobotSessionId: "@happyrobotSessionId",
+            negotiationId: "@negotiationId",
+            loadId: "@loadId",
+            mcNumber: "123456",
+            outcome: "human_review",
+            sentiment: "neutral",
+            agreedRate: "@agreedRate",
+            transferMock: "@transferMock",
+            summary: "Carrier verification failed due to a system issue.",
+            transcript: "@transcript",
+            extractedData: "{\"carrier\":{\"mcNumber\":\"123456\"}}",
+          },
+        },
+      },
+      { calls: { finalizeCall } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(finalizeCall).toHaveBeenCalledWith({
+      mcNumber: "123456",
+      outcome: "human_review",
+      sentiment: "neutral",
+      summary: "Carrier verification failed due to a system issue.",
+      extractedData: { carrier: { mcNumber: "123456" } },
+    });
+  });
 });

@@ -87,8 +87,31 @@ function booleanFromMcpValue(value: unknown) {
   return value;
 }
 
+function isUnresolvedTemplateValue(value: unknown) {
+  return typeof value === "string" && /^@[A-Za-z_][\w.]*$/.test(value.trim());
+}
+
 function stripEmptyOptionalValues(args: Record<string, unknown>) {
-  return Object.fromEntries(Object.entries(args).filter(([, value]) => value !== "" && value !== undefined && value !== null));
+  return Object.fromEntries(
+    Object.entries(args).filter(([, value]) => value !== "" && value !== undefined && value !== null && !isUnresolvedTemplateValue(value)),
+  );
+}
+
+function objectFromMcpValue(value: unknown) {
+  if (isRecord(value)) {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return isRecord(parsed) ? parsed : value;
+  } catch {
+    return value;
+  }
 }
 
 function normalizeMcpToolArgs(name: string, args: unknown) {
@@ -120,8 +143,11 @@ function normalizeMcpToolArgs(name: string, args: unknown) {
     normalized.transferMock = booleanFromMcpValue(normalized.transferMock);
   }
 
-  if (name === "finalize_call" && !isRecord(normalized.extractedData)) {
-    delete normalized.extractedData;
+  if (name === "finalize_call" && "extractedData" in normalized) {
+    normalized.extractedData = objectFromMcpValue(normalized.extractedData);
+    if (!isRecord(normalized.extractedData)) {
+      delete normalized.extractedData;
+    }
   }
 
   return normalized;
