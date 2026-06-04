@@ -7,7 +7,7 @@ type ErrorBannerProps = {
 };
 
 export function ErrorBanner({ message, onRetry, retrying = false }: ErrorBannerProps) {
-  const { title, message: body } = parseDashboardError(message);
+  const { title, message: clientMessage } = parseDashboardError(message);
 
   return (
     <section className="error-banner-section hr-enter" aria-labelledby="error-banner-title">
@@ -16,7 +16,7 @@ export function ErrorBanner({ message, onRetry, retrying = false }: ErrorBannerP
           <h2 id="error-banner-title" className="error-banner-title">
             {title}
           </h2>
-          <p className="error-banner-message">{body}</p>
+          <p className="error-banner-message">{clientMessage}</p>
         </div>
         <button
           type="button"

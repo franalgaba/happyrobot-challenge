@@ -1,4 +1,5 @@
 import { CallsTable } from "./components/CallsTable";
+import { DashboardLoading } from "./components/DashboardLoading";
 import { DashboardSummary } from "./components/DashboardSummary";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { LoadsTable } from "./components/LoadsTable";
@@ -20,6 +21,13 @@ export function App() {
     error,
     hasData: data != null,
   });
+
+  const showLoading = loading && data == null;
+  const showTables = data != null;
+
+  function handleRetry() {
+    void refetch();
+  }
 
   return (
     <>
@@ -47,20 +55,20 @@ export function App() {
         </section>
 
         {error ? (
-          <ErrorBanner message={error} onRetry={() => void refetch()} retrying={refreshing} />
+          <ErrorBanner message={error} onRetry={handleRetry} retrying={refreshing} />
         ) : null}
 
-        {loading && !data ? (
-          <div className="state-banner state-banner--loading hr-enter" role="status">
-            Loading metrics…
-          </div>
-        ) : null}
+        {showLoading ? <DashboardLoading /> : null}
 
         {data?.summary ? <DashboardSummary summary={data.summary} /> : null}
 
-        <CallsTable calls={data?.calls ?? []} />
-        <LoadsTable loads={data?.loads ?? []} />
-        <NegotiationsTable negotiations={data?.negotiations ?? []} />
+        {showTables ? (
+          <>
+            <CallsTable calls={data.calls} />
+            <LoadsTable loads={data.loads} />
+            <NegotiationsTable negotiations={data.negotiations} />
+          </>
+        ) : null}
       </main>
 
       <footer className="site-footer">

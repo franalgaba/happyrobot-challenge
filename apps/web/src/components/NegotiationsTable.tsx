@@ -1,4 +1,7 @@
-import { formatDateTime, formatMoney } from "../lib/format";
+import { formatDateTime } from "../lib/format";
+import { INTEGER_FORMAT } from "../lib/number-flow";
+import { AnimatedMoney } from "./AnimatedMoney";
+import { AnimatedNumber } from "./AnimatedNumber";
 import type { NegotiationRecord } from "@happyrobot-challenge/shared";
 import { Badge } from "./Badge";
 import { ReportTableSection } from "./ReportTableSection";
@@ -36,13 +39,21 @@ export function NegotiationsTable({ negotiations }: NegotiationsTableProps) {
               <td className="mono">{formatDateTime(negotiation.updatedAt)}</td>
               <td className="mono">{negotiation.loadId}</td>
               <td className="mono">{negotiation.mcNumber}</td>
-              <td className="mono">{negotiation.roundCount}</td>
+              <td>
+                <AnimatedNumber className="mono" value={negotiation.roundCount} format={INTEGER_FORMAT} />
+              </td>
               <td>
                 <Badge value={negotiation.status} />
               </td>
-              <td className="mono">{formatMoney(negotiation.lastOfferRate)}</td>
-              <td className="mono">{formatMoney(negotiation.lastCounterRate)}</td>
-              <td className="mono">{formatMoney(negotiation.agreedRate)}</td>
+              <td>
+                <AnimatedMoney value={negotiation.lastOfferRate} />
+              </td>
+              <td>
+                <AnimatedMoney value={negotiation.lastCounterRate} />
+              </td>
+              <td>
+                <AnimatedMoney value={negotiation.agreedRate} />
+              </td>
             </tr>
           ))}
         </tbody>

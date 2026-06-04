@@ -1,3 +1,4 @@
+import { NumberFlowGroup } from "@number-flow/react";
 import {
   OUTCOME_COLORS,
   OUTCOME_LABELS,
@@ -5,7 +6,9 @@ import {
   SENTIMENT_LABELS,
 } from "../config/display-maps";
 import { sortCountEntries } from "../lib/format";
+import { INTEGER_FORMAT } from "../lib/number-flow";
 import type { ReportSummary } from "@happyrobot-challenge/shared";
+import { AnimatedNumber } from "./AnimatedNumber";
 import { DistributionPanel } from "./DistributionPanel";
 import { KpiBand } from "./KpiBand";
 
@@ -13,12 +16,13 @@ type DashboardSummaryProps = {
   summary: ReportSummary;
 };
 
-type StatRow = {
-  label: string;
-  value: number;
+type MetricListPanelProps = {
+  title: string;
+  subtitle: string;
+  rows: { label: string; value: number }[];
 };
 
-function MetricListPanel({ title, subtitle, rows }: { title: string; subtitle: string; rows: StatRow[] }) {
+function MetricListPanel({ title, subtitle, rows }: MetricListPanelProps) {
   return (
     <article className="panel">
       <header className="panel-head">
@@ -31,7 +35,7 @@ function MetricListPanel({ title, subtitle, rows }: { title: string; subtitle: s
             <li key={row.label} className="dist-row">
               <div className="dist-meta">
                 <span className="dist-label">{row.label}</span>
-                <span className="mono">{row.value}</span>
+                <AnimatedNumber className="mono" value={row.value} format={INTEGER_FORMAT} />
               </div>
             </li>
           ))}
@@ -45,7 +49,7 @@ export function DashboardSummary({ summary }: DashboardSummaryProps) {
   const { negotiations, carrierVerification } = summary;
 
   return (
-    <>
+    <NumberFlowGroup>
       <KpiBand summary={summary} />
 
       <div className="panel-grid panel-grid--distributions hr-enter">
@@ -87,6 +91,6 @@ export function DashboardSummary({ summary }: DashboardSummaryProps) {
           ]}
         />
       </div>
-    </>
+    </NumberFlowGroup>
   );
 }

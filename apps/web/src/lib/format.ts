@@ -1,6 +1,6 @@
 import type { ReportSummary } from "@happyrobot-challenge/shared";
 
-const EMPTY_VALUE = "—";
+export const EMPTY_VALUE = "—";
 
 export function formatMoney(value: number | null | undefined) {
   if (value == null) return EMPTY_VALUE;
@@ -20,9 +20,13 @@ export function formatDateTime(iso: string) {
   }).format(new Date(iso));
 }
 
+export function sharePercent(part: number, total: number): number {
+  if (total === 0) return 0;
+  return Math.round((part / total) * 100);
+}
+
 export function formatPercent(part: number, total: number) {
-  if (total === 0) return "0%";
-  return `${Math.round((part / total) * 100)}%`;
+  return `${sharePercent(part, total)}%`;
 }
 
 export function sortCountEntries(record: Record<string, number>) {
@@ -31,10 +35,4 @@ export function sortCountEntries(record: Record<string, number>) {
 
 export function getBookedCount(summary: ReportSummary) {
   return summary.byOutcome.booked ?? 0;
-}
-
-export function formatBookRate(summary: ReportSummary) {
-  const booked = getBookedCount(summary);
-  if (summary.totalCalls === 0) return EMPTY_VALUE;
-  return formatPercent(booked, summary.totalCalls);
 }

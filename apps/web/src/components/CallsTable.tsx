@@ -1,4 +1,5 @@
-import { formatDateTime, formatMoney } from "../lib/format";
+import { EMPTY_VALUE, formatDateTime } from "../lib/format";
+import { AnimatedMoney } from "./AnimatedMoney";
 import type { CallRecord } from "@happyrobot-challenge/shared";
 import { Badge } from "./Badge";
 import { ReportTableSection } from "./ReportTableSection";
@@ -33,16 +34,18 @@ export function CallsTable({ calls }: CallsTableProps) {
           {calls.map((call) => (
             <tr key={call.id}>
               <td className="mono">{formatDateTime(call.createdAt)}</td>
-              <td className="mono">{call.mcNumber ?? "—"}</td>
-              <td className="mono">{call.loadId ?? "—"}</td>
+              <td className="mono">{call.mcNumber ?? EMPTY_VALUE}</td>
+              <td className="mono">{call.loadId ?? EMPTY_VALUE}</td>
               <td>
                 <Badge value={call.outcome} />
               </td>
               <td>
                 <Badge value={call.sentiment} />
               </td>
-              <td className="mono">{formatMoney(call.agreedRate)}</td>
-              <td>{call.summary ?? "—"}</td>
+              <td>
+                <AnimatedMoney value={call.agreedRate} />
+              </td>
+              <td>{call.summary ?? EMPTY_VALUE}</td>
             </tr>
           ))}
         </tbody>

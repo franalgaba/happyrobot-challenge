@@ -1,4 +1,5 @@
-import { formatDateTime, formatMoney } from "../lib/format";
+import { formatDateTime } from "../lib/format";
+import { AnimatedMoney } from "./AnimatedMoney";
 import type { LoadRecord } from "@happyrobot-challenge/shared";
 import { ReportTableSection } from "./ReportTableSection";
 
@@ -39,9 +40,15 @@ export function LoadsTable({ loads }: LoadsTableProps) {
               </td>
               <td>{load.equipmentType}</td>
               <td className="mono">{formatDateTime(load.pickupDatetime)}</td>
-              <td className="mono">{formatMoney(load.loadboardRate)}</td>
-              <td className="mono">{formatMoney(load.targetRate)}</td>
-              <td className="mono">{formatMoney(load.maxAutoRate)}</td>
+              <td>
+                <AnimatedMoney value={load.loadboardRate} />
+              </td>
+              <td>
+                <AnimatedMoney value={load.targetRate} />
+              </td>
+              <td>
+                <AnimatedMoney value={load.maxAutoRate} />
+              </td>
             </tr>
           ))}
         </tbody>

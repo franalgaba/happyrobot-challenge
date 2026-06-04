@@ -52,7 +52,11 @@ export function applyTheme(theme: Theme) {
   emitThemeChange();
 }
 
-export function useTheme() {
+export function useTheme(): {
+  theme: Theme;
+  setTheme: (next: Theme) => void;
+  toggleTheme: () => void;
+} {
   const theme = useSyncExternalStore(subscribe, getThemeSnapshot, (): Theme => "light");
 
   const setTheme = useCallback((next: Theme) => {

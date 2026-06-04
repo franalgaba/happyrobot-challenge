@@ -2,30 +2,37 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchDashboardData } from "../api";
 import { DASHBOARD_REFETCH_INTERVAL_MS } from "../lib/query-client";
 
-export const dashboardQueryKey = ["dashboard"] as const;
+const DASHBOARD_QUERY_KEY = ["dashboard"] as const;
 
-function toErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Failed to load dashboard data.";
-}
+export type DashboardQueryState = {
+  data: Awaited<ReturnType<typeof fetchDashboardData>> | undefined;
+  loading: boolean;
+  refreshing: boolean;
+  error: string | null;
+  lastUpdated: Date | null;
+  refetch: () => void;
+};
 
-/** Server state via TanStack Query — no fetch/useEffect in components (see React docs). */
-export function useDashboardData() {
+export function useDashboardData(): DashboardQueryState {
   const query = useQuery({
-    queryKey: dashboardQueryKey,
+    queryKey: DASHBOARD_QUERY_KEY,
     queryFn: fetchDashboardData,
     refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,
-    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
-  const error = query.error ? toErrorMessage(query.error) : null;
-  const lastUpdated = query.dataUpdatedAt > 0 ? new Date(query.dataUpdatedAt) : null;
+  const errorMessage =
+    query.error instanceof Error ? query.error.message : query.error ? String(query.error) : null;
 
   return {
-    data: query.data ?? null,
+    data: query.data,
     loading: query.isPending,
     refreshing: query.isFetching && !query.isPending,
-    error,
-    lastUpdated,
-    refetch: query.refetch,
+    error: errorMessage,
+    lastUpdated: query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null,
+    refetch: () => {
+      void query.refetch();
+    },
   };
 }

@@ -478,17 +478,38 @@ button {
   color: var(--hr-muted);
 }
 
-.kpi-value {
+.kpi-value,
+.kpi-value--hero {
   margin: 0;
   font-family: var(--font-serif);
   font-size: var(--text-xl);
-  line-height: 1.1;
+  line-height: 0.85;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .kpi-value--hero {
   font-size: var(--text-hero);
-  line-height: 1.02;
+}
+
+.kpi-hint-flow {
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.dist-meta-counts {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.85;
+}
+
+.mono number-flow-react,
+.kpi-value number-flow-react,
+.kpi-hint-flow {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
 .kpi-hint {

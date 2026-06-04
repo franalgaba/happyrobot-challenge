@@ -19,13 +19,17 @@ export function ReportTableSection({
   emptyBody,
   children,
 }: ReportTableSectionProps) {
+  const bodyClassName = isEmpty
+    ? "report-section-body report-section-body--empty"
+    : "report-section-body";
+
   return (
     <section className="report-section hr-enter" aria-labelledby={headingId}>
       <header className="report-section-head">
         <h2 id={headingId}>{title}</h2>
         <p>{subtitle}</p>
       </header>
-      <div className={`report-section-body${isEmpty ? " report-section-body--empty" : ""}`}>
+      <div className={bodyClassName}>
         {isEmpty ? (
           <div className="empty-state">
             <strong>{emptyTitle}</strong>
