@@ -408,11 +408,10 @@ function paragraph(text: string) {
   return [{ type: "paragraph", children: [{ text }] }];
 }
 
-function emptyToolMessage() {
+function mcpToolMessage(toolName: string) {
   return {
-    type: "none",
-    example: "",
-    description: [],
+    type: "ai",
+    description: paragraph(`Inform the user about the ${toolName} action`),
   };
 }
 
@@ -426,14 +425,26 @@ function toolParameters(tool: (typeof TOOL_DEFINITIONS)[number]) {
   }));
 }
 
-function templatedParameterValue(toolName: string, parameterName: string) {
-  return `{{${toolName}.${parameterName}}}`;
+function toolVariableValue(toolNodeId: string, parameterName: string) {
+  return [
+    {
+      type: "p",
+      children: [
+        {
+          type: "variable",
+          children: [{ text: "" }],
+          group_id: toolNodeId,
+          variable_id: parameterName,
+        },
+      ],
+    },
+  ];
 }
 
-function toolArgs(tool: (typeof TOOL_DEFINITIONS)[number]) {
+function toolArgs(tool: (typeof TOOL_DEFINITIONS)[number], toolNodeId: string) {
   return tool.parameters.map((parameter) => ({
     key: parameter.name,
-    value: templatedParameterValue(tool.name, parameter.name),
+    value: toolVariableValue(toolNodeId, parameter.name),
   }));
 }
 
@@ -491,7 +502,7 @@ async function configureVoiceAgentNode(client: HappyRobotClient, versionId: stri
   console.log(`Configured inbound voice agent node ${node.id}`);
 }
 
-function mcpCallConfiguration(toolName: string, credentialId: string) {
+function mcpCallConfiguration(toolName: string, credentialId: string, toolNodeId: string) {
   const tool = TOOL_DEFINITIONS.find((definition) => definition.name === toolName);
 
   return {
@@ -504,8 +515,19 @@ function mcpCallConfiguration(toolName: string, credentialId: string) {
       },
     },
     tool_name: toolName,
-    tool_args: tool ? toolArgs(tool) : [],
+    tool_args: tool ? toolArgs(tool, toolNodeId) : [],
     dynamic_headers: [],
+  };
+}
+
+function mcpToolFunction(tool: (typeof TOOL_DEFINITIONS)[number], credentialId: string) {
+  return {
+    is_mcp: true,
+    message: mcpToolMessage(tool.name),
+    parameters: toolParameters(tool),
+    description: paragraph(tool.description),
+    mcp_tool_name: tool.name,
+    mcp_server_credential_id: credentialId,
   };
 }
 
@@ -514,6 +536,7 @@ async function upsertToolNode(
   versionId: string,
   promptNode: WorkflowNode,
   tool: (typeof TOOL_DEFINITIONS)[number],
+  credentialId: string,
   sortIndex: number,
 ) {
   const nodes = await listVersionNodes(client, versionId);
@@ -523,11 +546,7 @@ async function upsertToolNode(
     name: tool.name,
     parent_id: promptNode.id,
     sort_index: sortIndex,
-    function: {
-      description: paragraph(tool.description),
-      parameters: toolParameters(tool),
-      message: emptyToolMessage(),
-    },
+    function: mcpToolFunction(tool, credentialId),
   };
 
   if (existing?.id) {
@@ -581,7 +600,7 @@ async function upsertMcpCallNode(
     sort_index: 0,
     event_id: MCP_CALL_EVENT_ID,
     integration_id: MCP_INTEGRATION_ID,
-    configuration: mcpCallConfiguration(tool.name, credentialId),
+    configuration: mcpCallConfiguration(tool.name, credentialId, toolNode.id),
   };
 
   if (existing?.id) {
@@ -599,7 +618,7 @@ async function upsertMcpCallNode(
         sort_index: 0,
         event_id: MCP_CALL_EVENT_ID,
         integration_id: MCP_INTEGRATION_ID,
-        configuration: mcpCallConfiguration(tool.name, credentialId),
+        configuration: mcpCallConfiguration(tool.name, credentialId, toolNode.id),
       },
     ],
   });
@@ -613,7 +632,7 @@ async function upsertMcpCallNode(
 
 async function configureToolNodes(client: HappyRobotClient, versionId: string, promptNode: WorkflowNode, credentialId: string) {
   for (const [index, tool] of TOOL_DEFINITIONS.entries()) {
-    const toolNode = await upsertToolNode(client, versionId, promptNode, tool, index);
+    const toolNode = await upsertToolNode(client, versionId, promptNode, tool, credentialId, index);
     await upsertMcpCallNode(client, versionId, toolNode, tool, credentialId);
   }
 }
