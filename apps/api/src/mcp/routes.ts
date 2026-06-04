@@ -14,10 +14,6 @@ const MCP_TOOL_FAILURE_MESSAGE = "MCP tool call failed.";
 
 type McpToolDefinition = (typeof mcpTools)[number];
 
-function mcpTokenIsValid(token: string, expectedToken: string) {
-  return token === expectedToken;
-}
-
 function safeMcpArgumentKeys(args: unknown) {
   return typeof args === "object" && args !== null && !Array.isArray(args) ? Object.keys(args) : [];
 }
@@ -44,14 +40,16 @@ function requestWithMcpAcceptHeader(request: Request) {
 }
 
 function passThroughMcpInputSchema(schema: JsonSchemaType): StandardSchemaWithJSON<unknown, unknown> {
+  const schemaJson = () => schema as Record<string, unknown>;
+
   return {
     "~standard": {
       version: 1,
       vendor: "happyrobot-challenge",
       validate: (value: unknown) => ({ value }),
       jsonSchema: {
-        input: () => schema as Record<string, unknown>,
-        output: () => schema as Record<string, unknown>,
+        input: schemaJson,
+        output: schemaJson,
       },
     },
   };
@@ -103,7 +101,7 @@ export function createMcpRoutes(services: AppServices, mcpPathToken: string) {
   const connected = server.connect(transport);
 
   mcp.all("/:token", async (c) => {
-    if (!mcpTokenIsValid(c.req.param("token"), mcpPathToken)) {
+    if (c.req.param("token") !== mcpPathToken) {
       return jsonError(c, 404, "mcp_not_found", "MCP server was not found.");
     }
 

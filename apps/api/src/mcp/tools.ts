@@ -159,7 +159,8 @@ function normalizeFinalizationData(toolName: string, args: Record<string, unknow
     return { ...args, extractedData };
   }
 
-  const { extractedData: _invalidExtractedData, ...argsWithoutExtractedData } = args;
+  const argsWithoutExtractedData = { ...args };
+  delete argsWithoutExtractedData.extractedData;
   return argsWithoutExtractedData;
 }
 
@@ -175,11 +176,27 @@ function normalizeMcpToolArgs(name: string, args: unknown) {
   return normalizeFinalizationData(name, argsWithTransferMock);
 }
 
+function verifyCarrierTool(services: AppServices, args: unknown) {
+  return services.carriers.verifyCarrier(VerifyCarrierRequestSchema.parse(args));
+}
+
+function searchLoadsTool(services: AppServices, args: unknown) {
+  return services.loads.searchLoads(SearchLoadsRequestSchema.parse(args));
+}
+
+function negotiateOfferTool(services: AppServices, args: unknown) {
+  return services.negotiations.negotiateOffer(NegotiateOfferRequestSchema.parse(args));
+}
+
+function finalizeCallTool(services: AppServices, args: unknown) {
+  return services.calls.finalizeCall(FinalizeCallRequestSchema.parse(args));
+}
+
 const mcpToolHandlers: Record<McpToolName, McpToolHandler> = {
-  verify_carrier: (services, args) => services.carriers.verifyCarrier(VerifyCarrierRequestSchema.parse(args)),
-  search_loads: (services, args) => services.loads.searchLoads(SearchLoadsRequestSchema.parse(args)),
-  negotiate_offer: (services, args) => services.negotiations.negotiateOffer(NegotiateOfferRequestSchema.parse(args)),
-  finalize_call: (services, args) => services.calls.finalizeCall(FinalizeCallRequestSchema.parse(args)),
+  verify_carrier: verifyCarrierTool,
+  search_loads: searchLoadsTool,
+  negotiate_offer: negotiateOfferTool,
+  finalize_call: finalizeCallTool,
 };
 
 function isMcpToolName(name: string): name is McpToolName {
