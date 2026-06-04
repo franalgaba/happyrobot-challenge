@@ -16,7 +16,9 @@ services:
       retries: 10
 
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
     command: sh -c "bun run db:migrate && bun run db:seed && bun apps/api/dist/index.js"
     depends_on:
       postgres:
