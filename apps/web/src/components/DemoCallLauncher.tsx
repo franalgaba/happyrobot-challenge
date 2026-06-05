@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { HappyRobotVoiceClient } from "@happyrobot-ai/sdk/voice";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { VoiceConnection } from "@happyrobot-ai/sdk/voice";
 import type { VoiceTokenResponse } from "@happyrobot-challenge/shared";
 import { fetchVoiceToken } from "../lib/voice-token";
@@ -31,27 +31,155 @@ type DemoCallLauncherProps = {
 
 function DemoCallScript() {
   return (
-    <div className="demo-call-script">
-      <p className="demo-call-script-label">What to say</p>
-      <ol className="demo-script-steps">
-        {DEMO_SCRIPT_STEPS.map((step, index) => (
-          <li key={step.label} className="demo-script-step">
-            <span className="demo-script-step-num" aria-hidden>
-              {index + 1}
-            </span>
-            <div className="demo-script-step-body">
-              <span className="demo-script-step-label">{step.label}</span>
-              {step.value ? (
-                <span className="demo-script-step-value mono">{step.value}</span>
-              ) : null}
-              {step.detail ? (
-                <span className="demo-script-step-detail">{step.detail}</span>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <ol className="demo-script-steps">
+      {DEMO_SCRIPT_STEPS.map((step, index) => (
+        <li key={step.label} className="demo-script-step">
+          <span className="demo-script-step-num" aria-hidden>
+            {index + 1}
+          </span>
+          <div className="demo-script-step-body">
+            <span className="demo-script-step-label">{step.label}</span>
+            {step.value ? <span className="demo-script-step-value mono">{step.value}</span> : null}
+            {step.detail ? <span className="demo-script-step-detail">{step.detail}</span> : null}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function demoScriptScreenReaderText() {
+  return DEMO_SCRIPT_STEPS.map((step, index) => {
+    const parts = [step.label, step.value, step.detail].filter(Boolean);
+    return `${index + 1}. ${parts.join(". ")}`;
+  }).join(" ");
+}
+
+const TOOLTIP_HIDE_DELAY_MS = 100;
+const TOOLTIP_EXIT_MS = 170;
+
+function DemoScriptTooltip() {
+  const tooltipId = useId();
+  const descriptionId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const hideTimeoutRef = useRef<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+
+  function clearHideTimeout() {
+    if (hideTimeoutRef.current != null) {
+      window.clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  }
+
+  function updatePosition() {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const tooltipWidth = Math.min(320, window.innerWidth - 32);
+    const left = Math.min(Math.max(16, rect.right - tooltipWidth), window.innerWidth - tooltipWidth - 16);
+
+    setPosition({
+      top: rect.bottom + 10,
+      left,
+    });
+  }
+
+  function toggleTooltip() {
+    if (visible) {
+      clearHideTimeout();
+      setVisible(false);
+      return;
+    }
+    showTooltip();
+  }
+
+  function handleTriggerClick() {
+    if (window.matchMedia("(hover: none)").matches) {
+      toggleTooltip();
+    }
+  }
+
+  function showTooltip() {
+    clearHideTimeout();
+    updatePosition();
+    setMounted(true);
+    window.requestAnimationFrame(() => setVisible(true));
+  }
+
+  function scheduleHide() {
+    clearHideTimeout();
+    hideTimeoutRef.current = window.setTimeout(() => {
+      setVisible(false);
+    }, TOOLTIP_HIDE_DELAY_MS);
+  }
+
+  useEffect(() => {
+    if (!mounted || visible) return;
+
+    const unmountTimer = window.setTimeout(() => setMounted(false), TOOLTIP_EXIT_MS);
+    return () => window.clearTimeout(unmountTimer);
+  }, [mounted, visible]);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    function handleResize() {
+      updatePosition();
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [mounted]);
+
+  useEffect(() => () => clearHideTimeout(), []);
+
+  return (
+    <>
+      <p id={descriptionId} className="visually-hidden">
+        {demoScriptScreenReaderText()}
+      </p>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="demo-call-script-trigger"
+        aria-expanded={visible}
+        aria-describedby={descriptionId}
+        aria-controls={visible ? tooltipId : undefined}
+        onMouseEnter={showTooltip}
+        onMouseLeave={scheduleHide}
+        onClick={handleTriggerClick}
+        onFocus={showTooltip}
+        onBlur={(event) => {
+          if (!tooltipRef.current?.contains(event.relatedTarget as Node)) {
+            scheduleHide();
+          }
+        }}
+      >
+        Demo script
+      </button>
+      {mounted
+        ? createPortal(
+            <div
+              ref={tooltipRef}
+              id={tooltipId}
+              role="tooltip"
+              className={`demo-script-tooltip${visible ? " is-visible" : ""}`}
+              style={{ top: position.top, left: position.left }}
+              onMouseEnter={showTooltip}
+              onMouseLeave={scheduleHide}
+            >
+              <p className="demo-script-tooltip-label">What to say</p>
+              <DemoCallScript />
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
 
@@ -74,6 +202,7 @@ export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
         room_name: tokenResponse.room_name,
       };
 
+      const { HappyRobotVoiceClient } = await import("@happyrobot-ai/sdk/voice");
       const voice = new HappyRobotVoiceClient(voiceConfig);
 
       const connection = await voice.connect({
@@ -99,9 +228,7 @@ export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
       connectionRef.current = connection;
     } catch (error) {
       console.error(error);
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not start the demo call.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Could not start the demo call.");
       setStatus("error");
     }
   }
@@ -132,43 +259,29 @@ export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
   const isConnecting = status === "connecting";
 
   return (
-    <aside className="demo-call" aria-label="Live demo call">
-      <p className="demo-call-script-label demo-call-eyebrow">Live demonstration</p>
-
+    <div className="demo-call" aria-label="Live demo call">
       {isConnecting && !isConnected ? (
         <p className="demo-call-status" role="status" aria-live="polite">
-          Connecting to agent…
+          Connecting…
         </p>
       ) : null}
 
       {isConnected ? (
-        <>
-          <p className="demo-call-status demo-call-status--live" role="status" aria-live="polite">
-            <span className="demo-call-live-dot" aria-hidden />
-            Live with carrier agent
-          </p>
-          <p className="demo-call-hint">End the call when finished—metrics refresh automatically.</p>
-        </>
+        <p className="demo-call-status demo-call-status--live" role="status" aria-live="polite">
+          <span className="demo-call-live-dot" aria-hidden />
+          Live with agent
+        </p>
       ) : null}
 
-      {!isConnected && !isConnecting ? (
-        <>
-          <p className="demo-call-hint">
-            Talk to the inbound carrier agent in your browser. Metrics update when the call ends.
-          </p>
-          {status === "error" && errorMessage ? (
-            <p className="demo-call-error" role="alert">
-              {errorMessage}
-            </p>
-          ) : null}
-        </>
+      {status === "error" && errorMessage ? (
+        <p className="demo-call-error" role="alert">
+          {errorMessage}
+        </p>
       ) : null}
 
-      <DemoCallScript />
-
-      <div className="demo-call-controls">
+      <div className="demo-call-actions">
         {isConnected ? (
-          <div className="demo-call-actions">
+          <>
             <button
               type="button"
               className="demo-call-btn demo-call-btn--secondary"
@@ -179,18 +292,21 @@ export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
             <button type="button" className="demo-call-btn demo-call-btn--primary" onClick={endCall}>
               End call
             </button>
-          </div>
+          </>
         ) : (
-          <button
-            type="button"
-            className="demo-call-btn demo-call-btn--primary"
-            onClick={startCall}
-            disabled={isConnecting}
-          >
-            {isConnecting ? "Connecting…" : "Start demo call"}
-          </button>
+          <>
+            <button
+              type="button"
+              className="demo-call-btn demo-call-btn--primary"
+              onClick={startCall}
+              disabled={isConnecting}
+            >
+              {isConnecting ? "Connecting…" : "Start demo call"}
+            </button>
+            {!isConnecting ? <DemoScriptTooltip /> : null}
+          </>
         )}
       </div>
-    </aside>
+    </div>
   );
 }

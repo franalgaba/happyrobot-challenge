@@ -1,7 +1,9 @@
+import { lazy, Suspense } from "react";
 import { CallsWorkSection } from "./components/CallsWorkSection";
 import { CollapsibleBoard } from "./components/CollapsibleBoard";
 import { DemoCallLauncher } from "./components/DemoCallLauncher";
 import { DashboardLoading } from "./components/DashboardLoading";
+import { DashboardIntelligenceFallback } from "./components/DashboardIntelligenceFallback";
 import { DashboardOverview } from "./components/DashboardOverview";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { LoadsBoard } from "./components/LoadsBoard";
@@ -13,6 +15,11 @@ import { resolveConnectionStatus } from "./lib/connection-status";
 import { useTheme } from "./theme";
 
 const CLIENT_NAME = import.meta.env.VITE_CLIENT_NAME ?? "Acme Logistics";
+
+const DashboardIntelligence = lazy(async () => {
+  const module = await import("./components/DashboardIntelligence");
+  return { default: module.DashboardIntelligence };
+});
 
 export function App() {
   const { theme, toggleTheme } = useTheme();
@@ -50,13 +57,12 @@ export function App() {
 
       <main id="dashboard-main" className="dashboard" tabIndex={-1}>
         <div className="page-intro hr-enter">
-          <section className="intro-card" aria-labelledby="dashboard-title">
+          <div className="page-intro-copy">
             <h1 id="dashboard-title">Inbound carrier sales</h1>
             <p className="page-intro-lede">
-              Operations view for {CLIENT_NAME}—booking performance, call outcomes, and auditable
-              carrier conversations.
+              {CLIENT_NAME} operations view — live booking performance and call outcomes.
             </p>
-          </section>
+          </div>
           <DemoCallLauncher onCallEnded={refetch} />
         </div>
 
@@ -69,29 +75,38 @@ export function App() {
         {data?.summary ? <DashboardOverview summary={data.summary} /> : null}
 
         {showWork ? (
-          <div className="dashboard-work">
-            <CallsWorkSection
-              calls={data.calls}
-              loads={data.loads}
-              negotiations={data.negotiations}
-            />
-            <CollapsibleBoard
-              id="loads-board"
-              title="Active loads"
-              count={activeLoadCount}
-              hint="Coverage available for matching"
-            >
-              <LoadsBoard loads={data.loads} />
-            </CollapsibleBoard>
-            <CollapsibleBoard
-              id="negotiations-board"
-              title="All negotiations"
-              count={data.negotiations.length}
-              hint="Full offer history across sessions"
-            >
-              <NegotiationsBoard negotiations={data.negotiations} />
-            </CollapsibleBoard>
-          </div>
+          <>
+            <Suspense fallback={<DashboardIntelligenceFallback />}>
+              <DashboardIntelligence
+                loads={data.loads}
+                calls={data.calls}
+                negotiations={data.negotiations}
+              />
+            </Suspense>
+            <div className="dashboard-work">
+              <CallsWorkSection
+                calls={data.calls}
+                loads={data.loads}
+                negotiations={data.negotiations}
+              />
+              <CollapsibleBoard
+                id="loads-board"
+                title="Active loads"
+                count={activeLoadCount}
+                hint="Coverage available for matching"
+              >
+                <LoadsBoard loads={data.loads} />
+              </CollapsibleBoard>
+              <CollapsibleBoard
+                id="negotiations-board"
+                title="All negotiations"
+                count={data.negotiations.length}
+                hint="Full offer history across sessions"
+              >
+                <NegotiationsBoard negotiations={data.negotiations} />
+              </CollapsibleBoard>
+            </div>
+          </>
         ) : null}
       </main>
 

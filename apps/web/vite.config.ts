@@ -76,6 +76,20 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [dashboardBffPlugin(bffRequestListener), react()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("react-simple-maps") || id.includes("node_modules/d3-")) {
+              return "maps";
+            }
+            if (id.includes("@happyrobot-ai/sdk") || id.includes("livekit-client")) {
+              return "voice";
+            }
+          },
+        },
+      },
+    },
     server: {
       host: "127.0.0.1",
       port: 5173,

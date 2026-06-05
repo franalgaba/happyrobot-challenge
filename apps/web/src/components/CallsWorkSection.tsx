@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState, type KeyboardEvent } from "react";
 import type { CallRecord, LoadRecord, NegotiationRecord } from "@happyrobot-challenge/shared";
 import { callNeedsReview } from "../lib/dashboard-metrics";
 import { CallsTable } from "./CallsTable";
@@ -13,6 +13,9 @@ type CallsWorkSectionProps = {
 
 export function CallsWorkSection({ calls, loads, negotiations }: CallsWorkSectionProps) {
   const [view, setView] = useState<CallsView>("recent");
+  const recentTabId = useId();
+  const reviewTabId = useId();
+  const panelId = useId();
   const reviewCount = useMemo(() => calls.filter(callNeedsReview).length, [calls]);
 
   const visibleCalls = useMemo(() => {
@@ -33,6 +36,27 @@ export function CallsWorkSection({ calls, loads, negotiations }: CallsWorkSectio
       ? "Calls flagged for follow-up or human review will appear here."
       : "When a carrier conversation is finalized, outcomes and rates will appear here.";
 
+  function selectView(nextView: CallsView) {
+    setView(nextView);
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentView: CallsView) {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") {
+      return;
+    }
+
+    event.preventDefault();
+    if (event.key === "Home" || event.key === "ArrowLeft") {
+      selectView("recent");
+      return;
+    }
+    if (event.key === "End" || event.key === "ArrowRight") {
+      selectView("review");
+      return;
+    }
+    selectView(currentView === "recent" ? "review" : "recent");
+  }
+
   return (
     <section className="report-section calls-work hr-enter" aria-labelledby="calls-heading">
       <header className="report-section-head">
@@ -45,9 +69,13 @@ export function CallsWorkSection({ calls, loads, negotiations }: CallsWorkSectio
             <button
               type="button"
               role="tab"
+              id={recentTabId}
               aria-selected={view === "recent"}
+              aria-controls={panelId}
+              tabIndex={view === "recent" ? 0 : -1}
               className={`segmented-control-btn${view === "recent" ? " is-active" : ""}`}
-              onClick={() => setView("recent")}
+              onClick={() => selectView("recent")}
+              onKeyDown={(event) => handleTabKeyDown(event, "recent")}
             >
               Recent
               <span className="segmented-control-count mono">{calls.length}</span>
@@ -55,9 +83,13 @@ export function CallsWorkSection({ calls, loads, negotiations }: CallsWorkSectio
             <button
               type="button"
               role="tab"
+              id={reviewTabId}
               aria-selected={view === "review"}
+              aria-controls={panelId}
+              tabIndex={view === "review" ? 0 : -1}
               className={`segmented-control-btn${view === "review" ? " is-active" : ""}`}
-              onClick={() => setView("review")}
+              onClick={() => selectView("review")}
+              onKeyDown={(event) => handleTabKeyDown(event, "review")}
             >
               Needs review
               <span className="segmented-control-count mono">{reviewCount}</span>
@@ -65,13 +97,21 @@ export function CallsWorkSection({ calls, loads, negotiations }: CallsWorkSectio
           </div>
         </div>
       </header>
-      <CallsTable
-        calls={visibleCalls}
-        loads={loads}
-        negotiations={negotiations}
-        emptyTitle={emptyTitle}
-        emptyBody={emptyBody}
-      />
+      <div
+        role="tabpanel"
+        id={panelId}
+        aria-labelledby={view === "recent" ? recentTabId : reviewTabId}
+        tabIndex={0}
+        className="calls-work-panel"
+      >
+        <CallsTable
+          calls={visibleCalls}
+          loads={loads}
+          negotiations={negotiations}
+          emptyTitle={emptyTitle}
+          emptyBody={emptyBody}
+        />
+      </div>
     </section>
   );
 }
