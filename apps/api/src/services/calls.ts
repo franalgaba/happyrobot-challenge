@@ -5,6 +5,7 @@ import type { Db } from "../db/client";
 import { calls, carriers, negotiations } from "../db/schema";
 import { conflict } from "../utils/errors";
 import { normalizeMcNumber } from "../utils/http";
+import { logInfo } from "../utils/logging";
 import type { CallService } from "./types";
 
 type CallStore = Pick<Db, "execute" | "insert" | "select" | "update">;
@@ -47,10 +48,24 @@ async function lockCallIdentity(db: CallStore, input: FinalizeCallRequest) {
 }
 
 function callIdentityFrom(input: FinalizeCallRequest): CallIdentity {
+  const mcNumber = input.mcNumber ? normalizeMcNumber(input.mcNumber) : undefined;
+
   return {
-    runId: input.happyrobotRunId,
-    sessionId: input.happyrobotSessionId,
+    runId: callIdentityValue(input.happyrobotRunId, mcNumber),
+    sessionId: callIdentityValue(input.happyrobotSessionId, mcNumber),
   };
+}
+
+function callIdentityValue(value: string | undefined, mcNumber: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (mcNumber && normalizeMcNumber(value) === mcNumber) {
+    return undefined;
+  }
+
+  return value;
 }
 
 function callIdentityLockKeys(identity: CallIdentity) {
@@ -188,10 +203,12 @@ async function findExistingCall(db: CallStore, input: FinalizeCallRequest) {
 }
 
 function callInsertValues(input: FinalizeCallRequest, options: CallInsertOptions): typeof calls.$inferInsert {
+  const identity = callIdentityFrom(input);
+
   return {
     id: options.callId,
-    happyrobotRunId: input.happyrobotRunId,
-    happyrobotSessionId: input.happyrobotSessionId,
+    happyrobotRunId: identity.runId,
+    happyrobotSessionId: identity.sessionId,
     negotiationId: input.negotiationId,
     loadId: input.loadId ?? options.negotiation?.loadId,
     mcNumber: options.mcNumber,
@@ -230,14 +247,32 @@ export function createCallService(db: Db): CallService {
   return {
     async finalizeCall(input: FinalizeCallRequest) {
       return db.transaction(async (tx) => {
+        const identity = callIdentityFrom(input);
         await lockCallIdentity(tx, input);
 
         const existingCall = await findExistingCall(tx, input);
         if (existingCall) {
+          logInfo("call_finalized", {
+            callId: existingCall.id,
+            inserted: false,
+            hasRunId: Boolean(identity.runId),
+            hasSessionId: Boolean(identity.sessionId),
+            mcNumber: input.mcNumber ? normalizeMcNumber(input.mcNumber) : undefined,
+            outcome: input.outcome,
+          });
           return { callId: existingCall.id, stored: true as const };
         }
 
         const callId = await insertCall(tx, input);
+
+        logInfo("call_finalized", {
+          callId,
+          inserted: true,
+          hasRunId: Boolean(identity.runId),
+          hasSessionId: Boolean(identity.sessionId),
+          mcNumber: input.mcNumber ? normalizeMcNumber(input.mcNumber) : undefined,
+          outcome: input.outcome,
+        });
 
         return { callId, stored: true as const };
       });

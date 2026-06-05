@@ -164,6 +164,27 @@ function normalizeFinalizationData(toolName: string, args: Record<string, unknow
   return argsWithoutExtractedData;
 }
 
+function normalizeHappyRobotIdentities(toolName: string, args: Record<string, unknown>) {
+  if (toolName !== "finalize_call" || typeof args.mcNumber !== "string") {
+    return args;
+  }
+
+  const mcNumber = args.mcNumber.replace(/^MC[-\s]?/i, "").replace(/\D/g, "");
+  if (!mcNumber) {
+    return args;
+  }
+
+  return Object.fromEntries(
+    Object.entries(args).filter(([fieldName, value]) => {
+      if (fieldName !== "happyrobotRunId" && fieldName !== "happyrobotSessionId") {
+        return true;
+      }
+
+      return typeof value !== "string" || value.replace(/^MC[-\s]?/i, "").replace(/\D/g, "") !== mcNumber;
+    }),
+  );
+}
+
 function normalizeMcpToolArgs(name: string, args: unknown) {
   if (!isRecord(args)) {
     return args;
@@ -171,7 +192,8 @@ function normalizeMcpToolArgs(name: string, args: unknown) {
 
   const argsWithOptionalValuesRemoved = stripEmptyOptionalValues(args);
   const argsWithMcNumber = normalizeMcNumber(argsWithOptionalValuesRemoved);
-  const argsWithNumericValues = normalizeNumericFields(argsWithMcNumber);
+  const argsWithHappyRobotIdentities = normalizeHappyRobotIdentities(name, argsWithMcNumber);
+  const argsWithNumericValues = normalizeNumericFields(argsWithHappyRobotIdentities);
   const argsWithTransferMock = normalizeTransferMock(argsWithNumericValues);
   return normalizeFinalizationData(name, argsWithTransferMock);
 }

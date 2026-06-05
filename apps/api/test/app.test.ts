@@ -476,6 +476,37 @@ describe("Hono API", () => {
     });
   });
 
+  it("does not treat MC numbers as HappyRobot call identities", async () => {
+    const finalizeCall = vi.fn(services().calls.finalizeCall);
+    const response = await postMcp(
+      {
+        jsonrpc: "2.0",
+        id: 10,
+        method: "tools/call",
+        params: {
+          name: "finalize_call",
+          arguments: {
+            happyrobotRunId: "MC 123456",
+            happyrobotSessionId: "123456",
+            mcNumber: "123456",
+            outcome: "booked",
+            sentiment: "positive",
+            summary: "Carrier booked the demo load.",
+          },
+        },
+      },
+      { calls: { finalizeCall } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(finalizeCall).toHaveBeenCalledWith({
+      mcNumber: "123456",
+      outcome: "booked",
+      sentiment: "positive",
+      summary: "Carrier booked the demo load.",
+    });
+  });
+
   it("rejects missing required negotiation MCP arguments", async () => {
     const negotiateOffer = vi.fn(services().negotiations.negotiateOffer);
     const response = await postMcp(

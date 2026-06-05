@@ -4,7 +4,7 @@ import { Hono } from "hono";
 
 import type { AppServices } from "../services/types";
 import { jsonError } from "../utils/http";
-import { logError } from "../utils/logging";
+import { logError, logInfo } from "../utils/logging";
 import { matchesSecret } from "../utils/secrets";
 import { callMcpTool, mcpTools } from "./tools";
 
@@ -93,7 +93,13 @@ function registerMcpTool(server: McpServer, services: AppServices, tool: McpTool
     },
     async (args) => {
       try {
-        return toolCallResult(await callMcpTool(services, tool.name, args));
+        const result = await callMcpTool(services, tool.name, args);
+        logInfo("mcp_tool_completed", {
+          operation: "mcp_tool",
+          mcpToolName: tool.name,
+          mcpArgKeys: safeMcpArgumentKeys(args),
+        });
+        return toolCallResult(result);
       } catch (error) {
         logMcpToolError(tool.name, args, error);
         throw new Error(MCP_TOOL_FAILURE_MESSAGE);

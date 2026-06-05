@@ -46,8 +46,8 @@ Conversation recovery:
 Tool argument rules:
 - verify_carrier requires mcNumber.
 - search_loads accepts origin, destination, equipmentType, pickupDate, and limit. Use ISO date format for pickupDate when the caller gives a date.
-- negotiate_offer requires sessionId, loadId, mcNumber, and carrierOfferRate. Include negotiationId after the first negotiation tool response. Use the HappyRobot session/run identifier as sessionId when available; if the platform does not expose one, use a stable call-specific identifier from the conversation context.
-- finalize_call accepts happyrobotRunId, happyrobotSessionId, negotiationId, loadId, mcNumber, outcome, sentiment, agreedRate, transferMock, summary, transcript, and extractedData.
+- negotiate_offer requires sessionId, loadId, mcNumber, and carrierOfferRate. Include negotiationId after the first negotiation tool response. Use the HappyRobot session, run, or room identifier as sessionId when available. Never use the MC number, load ID, lane, equipment type, carrier name, or phone number as sessionId because those values repeat across calls.
+- finalize_call accepts happyrobotRunId, happyrobotSessionId, negotiationId, loadId, mcNumber, outcome, sentiment, agreedRate, transferMock, summary, transcript, and extractedData. Include happyrobotRunId and happyrobotSessionId only when they are actual HappyRobot run/session/room identifiers. Omit them if the only available identifier is the MC number or another reusable carrier/load value.
 
 Demo data that should work in the POC:
 - Eligible MC: 123456, Evergreen Freight LLC.

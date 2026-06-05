@@ -73,12 +73,16 @@ export function decideNegotiation(input: {
 }
 
 function assertNegotiationMatchesInput(negotiation: StoredNegotiation, input: NegotiateOfferRequest, mcNumber: string) {
-  const matches =
-    negotiation.sessionId === input.sessionId && negotiation.loadId === input.loadId && negotiation.mcNumber === mcNumber;
+  const sessionMatches = isCarrierOnlySessionId(input.sessionId, mcNumber) || negotiation.sessionId === input.sessionId;
+  const matches = sessionMatches && negotiation.loadId === input.loadId && negotiation.mcNumber === mcNumber;
 
   if (!matches) {
     throw notFound("Negotiation was not found for the supplied session, load, and carrier.", "negotiation_not_found");
   }
+}
+
+function isCarrierOnlySessionId(sessionId: string, mcNumber: string) {
+  return normalizeMcNumber(sessionId) === mcNumber;
 }
 
 async function findActiveLoad(db: NegotiationStore, loadId: string) {
@@ -112,6 +116,10 @@ async function findExistingNegotiation(db: NegotiationStore, input: NegotiateOff
     }
     assertNegotiationMatchesInput(negotiation, input, mcNumber);
     return negotiation;
+  }
+
+  if (isCarrierOnlySessionId(input.sessionId, mcNumber)) {
+    return undefined;
   }
 
   const [negotiation] = await db
