@@ -11,6 +11,30 @@ type CallsWorkSectionProps = {
   negotiations: NegotiationRecord[];
 };
 
+const VIEW_COPY: Record<
+  CallsView,
+  { subtitle: string; emptyTitle: string; emptyBody: string }
+> = {
+  recent: {
+    subtitle: "Newest finalized conversations—outcome, sentiment, negotiation, and rate",
+    emptyTitle: "No calls recorded yet",
+    emptyBody: "When a carrier conversation is finalized, outcomes and rates will appear here.",
+  },
+  review: {
+    subtitle: "Follow-ups, human review, and negative sentiment",
+    emptyTitle: "Nothing needs review",
+    emptyBody: "Calls flagged for follow-up or human review will appear here.",
+  },
+};
+
+const TAB_NAVIGATION_KEYS = new Set(["ArrowRight", "ArrowLeft", "Home", "End"]);
+
+function viewFromNavigationKey(key: string): CallsView | null {
+  if (key === "Home" || key === "ArrowLeft") return "recent";
+  if (key === "End" || key === "ArrowRight") return "review";
+  return null;
+}
+
 export function CallsWorkSection({ calls, loads, negotiations }: CallsWorkSectionProps) {
   const [view, setView] = useState<CallsView>("recent");
   const recentTabId = useId();
@@ -25,36 +49,14 @@ export function CallsWorkSection({ calls, loads, negotiations }: CallsWorkSectio
     return calls;
   }, [calls, view]);
 
-  const subtitle =
-    view === "review"
-      ? "Follow-ups, human review, and negative sentiment"
-      : "Newest finalized conversations—outcome, sentiment, negotiation, and rate";
+  const { subtitle, emptyTitle, emptyBody } = VIEW_COPY[view];
 
-  const emptyTitle = view === "review" ? "Nothing needs review" : "No calls recorded yet";
-  const emptyBody =
-    view === "review"
-      ? "Calls flagged for follow-up or human review will appear here."
-      : "When a carrier conversation is finalized, outcomes and rates will appear here.";
-
-  function selectView(nextView: CallsView) {
-    setView(nextView);
-  }
-
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentView: CallsView) {
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") {
-      return;
-    }
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!TAB_NAVIGATION_KEYS.has(event.key)) return;
 
     event.preventDefault();
-    if (event.key === "Home" || event.key === "ArrowLeft") {
-      selectView("recent");
-      return;
-    }
-    if (event.key === "End" || event.key === "ArrowRight") {
-      selectView("review");
-      return;
-    }
-    selectView(currentView === "recent" ? "review" : "recent");
+    const nextView = viewFromNavigationKey(event.key);
+    if (nextView) setView(nextView);
   }
 
   return (
@@ -74,8 +76,8 @@ export function CallsWorkSection({ calls, loads, negotiations }: CallsWorkSectio
               aria-controls={panelId}
               tabIndex={view === "recent" ? 0 : -1}
               className={`segmented-control-btn${view === "recent" ? " is-active" : ""}`}
-              onClick={() => selectView("recent")}
-              onKeyDown={(event) => handleTabKeyDown(event, "recent")}
+              onClick={() => setView("recent")}
+              onKeyDown={handleTabKeyDown}
             >
               Recent
               <span className="segmented-control-count mono">{calls.length}</span>
@@ -88,8 +90,8 @@ export function CallsWorkSection({ calls, loads, negotiations }: CallsWorkSectio
               aria-controls={panelId}
               tabIndex={view === "review" ? 0 : -1}
               className={`segmented-control-btn${view === "review" ? " is-active" : ""}`}
-              onClick={() => selectView("review")}
-              onKeyDown={(event) => handleTabKeyDown(event, "review")}
+              onClick={() => setView("review")}
+              onKeyDown={handleTabKeyDown}
             >
               Needs review
               <span className="segmented-control-count mono">{reviewCount}</span>

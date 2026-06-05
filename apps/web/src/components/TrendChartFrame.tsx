@@ -18,6 +18,14 @@ type TrendChartFrameProps<T extends ChartDayBucket> = {
   children: (activeIndex: number | null) => ReactNode;
 };
 
+function firstBucketKey<T extends ChartDayBucket>(buckets: T[]): string | null {
+  return buckets[0]?.dateKey ?? null;
+}
+
+function lastBucketKey<T extends ChartDayBucket>(buckets: T[]): string | null {
+  return buckets[buckets.length - 1]?.dateKey ?? null;
+}
+
 export function TrendChartFrame<T extends ChartDayBucket>({
   buckets,
   interaction,
@@ -44,37 +52,42 @@ export function TrendChartFrame<T extends ChartDayBucket>({
   );
 
   function handleChartKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "ArrowRight") {
-      event.preventDefault();
-      moveDay(1);
-      return;
-    }
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      moveDay(-1);
-      return;
-    }
-    if (event.key === "Home") {
-      event.preventDefault();
-      if (buckets[0]) onDayHover(buckets[0].dateKey);
-      return;
-    }
-    if (event.key === "End") {
-      event.preventDefault();
-      if (buckets[buckets.length - 1]) onDayHover(buckets[buckets.length - 1].dateKey);
-      return;
-    }
-    if (event.key === "Enter" || event.key === " ") {
-      if (activeDayKey) {
+    switch (event.key) {
+      case "ArrowRight":
+        event.preventDefault();
+        moveDay(1);
+        return;
+      case "ArrowLeft":
+        event.preventDefault();
+        moveDay(-1);
+        return;
+      case "Home": {
+        event.preventDefault();
+        const firstKey = firstBucketKey(buckets);
+        if (firstKey) onDayHover(firstKey);
+        return;
+      }
+      case "End": {
+        event.preventDefault();
+        const lastKey = lastBucketKey(buckets);
+        if (lastKey) onDayHover(lastKey);
+        return;
+      }
+      case "Enter":
+      case " ":
+        if (!activeDayKey) return;
         event.preventDefault();
         onDaySelect(activeDayKey);
-      }
+        return;
+      default:
+        return;
     }
   }
 
   function handleChartFocus() {
-    if (!activeDayKey && buckets.length > 0) {
-      onDayHover(buckets[buckets.length - 1].dateKey);
+    const lastKey = lastBucketKey(buckets);
+    if (!activeDayKey && lastKey) {
+      onDayHover(lastKey);
     }
   }
 
@@ -98,11 +111,7 @@ export function TrendChartFrame<T extends ChartDayBucket>({
         onKeyDown={handleChartKeyDown}
         onFocus={handleChartFocus}
       >
-        <svg
-          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-          className="trend-chart"
-          aria-hidden="true"
-        >
+        <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="trend-chart" aria-hidden="true">
           {highlightColumn ? (
             <rect
               x={highlightColumn.slotX}

@@ -1,10 +1,10 @@
 import { Fragment, useId, useState } from "react";
-import { EMPTY_VALUE, formatDateTime, formatMoney } from "../lib/format";
-import { findLoadForCall, findNegotiationForCall, formatLane } from "../lib/call-details";
-import { AnimatedMoney } from "./AnimatedMoney";
-import { INTEGER_FORMAT } from "../lib/number-flow";
-import { AnimatedNumber } from "./AnimatedNumber";
 import type { CallRecord, LoadRecord, NegotiationRecord } from "@happyrobot-challenge/shared";
+import { findLoadForCall, findNegotiationForCall, formatLane } from "../lib/call-details";
+import { EMPTY_VALUE, formatDateTime, formatMoney } from "../lib/format";
+import { INTEGER_FORMAT } from "../lib/number-flow";
+import { AnimatedMoney } from "./AnimatedMoney";
+import { AnimatedNumber } from "./AnimatedNumber";
 import { Badge } from "./Badge";
 
 type CallsTableProps = {
@@ -15,15 +15,21 @@ type CallsTableProps = {
   emptyBody: string;
 };
 
-function CallDetailPanel({
-  call,
-  load,
-  negotiation,
-}: {
+type CallDetailPanelProps = {
   call: CallRecord;
   load: LoadRecord | undefined;
   negotiation: NegotiationRecord | undefined;
-}) {
+};
+
+function callHasExpandableDetails(
+  call: CallRecord,
+  load: LoadRecord | undefined,
+  negotiation: NegotiationRecord | undefined,
+): boolean {
+  return Boolean(call.summary || negotiation || load || call.transferMock);
+}
+
+function CallDetailPanel({ call, load, negotiation }: CallDetailPanelProps) {
   return (
     <dl className="call-detail-panel">
       <div>
@@ -68,6 +74,10 @@ export function CallsTable({
   const detailPrefix = useId();
   const [expandedCallId, setExpandedCallId] = useState<string | null>(null);
 
+  function toggleCallDetails(callId: string, expanded: boolean) {
+    setExpandedCallId(expanded ? null : callId);
+  }
+
   if (calls.length === 0) {
     return (
       <div className="report-section-body report-section-body--empty">
@@ -104,7 +114,7 @@ export function CallsTable({
             const negotiation = findNegotiationForCall(negotiations, call);
             const detailId = `${detailPrefix}-${call.id}`;
             const expanded = expandedCallId === call.id;
-            const hasDetails = Boolean(call.summary || negotiation || load || call.transferMock);
+            const hasDetails = callHasExpandableDetails(call, load, negotiation);
 
             return (
               <Fragment key={call.id}>
@@ -116,7 +126,7 @@ export function CallsTable({
                         className="call-row-toggle"
                         aria-expanded={expanded}
                         aria-controls={detailId}
-                        onClick={() => setExpandedCallId(expanded ? null : call.id)}
+                        onClick={() => toggleCallDetails(call.id, expanded)}
                       >
                         {expanded ? "Hide" : "Details"}
                       </button>

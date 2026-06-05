@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { createPortal } from "react-dom";
 import type { VoiceConnection } from "@happyrobot-ai/sdk/voice";
 import type { VoiceTokenResponse } from "@happyrobot-challenge/shared";
@@ -12,7 +12,22 @@ type DemoScriptStep = {
   detail?: string;
 };
 
+type DemoCallLauncherProps = {
+  onCallEnded?: () => void;
+};
+
+type TooltipPosition = {
+  top: number;
+  left: number;
+};
+
 const DEMO_MC_NUMBER = "585242";
+const TOOLTIP_MAX_WIDTH_PX = 320;
+const VIEWPORT_EDGE_PADDING_PX = 16;
+const VIEWPORT_GUTTER_PX = 32;
+const TOOLTIP_OFFSET_PX = 10;
+const TOOLTIP_HIDE_DELAY_MS = 100;
+const TOOLTIP_EXIT_MS = 170;
 
 const DEMO_SCRIPT_STEPS: DemoScriptStep[] = [
   {
@@ -25,9 +40,38 @@ const DEMO_SCRIPT_STEPS: DemoScriptStep[] = [
   { label: "Close", detail: "Accept the counter, then wrap up after transfer" },
 ];
 
-type DemoCallLauncherProps = {
-  onCallEnded?: () => void;
-};
+function isCoarsePointer(): boolean {
+  return window.matchMedia("(hover: none)").matches;
+}
+
+function formatDemoScriptForScreenReader(): string {
+  return DEMO_SCRIPT_STEPS.map((step, index) => {
+    const parts = [step.label, step.value, step.detail].filter(Boolean);
+    return `${index + 1}. ${parts.join(". ")}`;
+  }).join(" ");
+}
+
+function computeTooltipPosition(trigger: HTMLElement): TooltipPosition {
+  const rect = trigger.getBoundingClientRect();
+  const tooltipWidth = Math.min(TOOLTIP_MAX_WIDTH_PX, window.innerWidth - VIEWPORT_GUTTER_PX);
+  const left = Math.min(
+    Math.max(VIEWPORT_EDGE_PADDING_PX, rect.right - tooltipWidth),
+    window.innerWidth - tooltipWidth - VIEWPORT_EDGE_PADDING_PX,
+  );
+
+  return {
+    top: rect.bottom + TOOLTIP_OFFSET_PX,
+    left,
+  };
+}
+
+function buildVoiceConfig(tokenResponse: VoiceTokenResponse) {
+  return {
+    url: tokenResponse.url,
+    token: tokenResponse.token,
+    room_name: tokenResponse.room_name,
+  };
+}
 
 function DemoCallScript() {
   return (
@@ -48,16 +92,6 @@ function DemoCallScript() {
   );
 }
 
-function demoScriptScreenReaderText() {
-  return DEMO_SCRIPT_STEPS.map((step, index) => {
-    const parts = [step.label, step.value, step.detail].filter(Boolean);
-    return `${index + 1}. ${parts.join(". ")}`;
-  }).join(" ");
-}
-
-const TOOLTIP_HIDE_DELAY_MS = 100;
-const TOOLTIP_EXIT_MS = 170;
-
 function DemoScriptTooltip() {
   const tooltipId = useId();
   const descriptionId = useId();
@@ -66,56 +100,52 @@ function DemoScriptTooltip() {
   const hideTimeoutRef = useRef<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState<TooltipPosition>({ top: 0, left: 0 });
 
   function clearHideTimeout() {
-    if (hideTimeoutRef.current != null) {
-      window.clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
+    if (hideTimeoutRef.current == null) return;
+
+    window.clearTimeout(hideTimeoutRef.current);
+    hideTimeoutRef.current = null;
   }
 
-  function updatePosition() {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-
-    const rect = trigger.getBoundingClientRect();
-    const tooltipWidth = Math.min(320, window.innerWidth - 32);
-    const left = Math.min(Math.max(16, rect.right - tooltipWidth), window.innerWidth - tooltipWidth - 16);
-
-    setPosition({
-      top: rect.bottom + 10,
-      left,
-    });
-  }
-
-  function toggleTooltip() {
-    if (visible) {
-      clearHideTimeout();
-      setVisible(false);
-      return;
-    }
-    showTooltip();
-  }
-
-  function handleTriggerClick() {
-    if (window.matchMedia("(hover: none)").matches) {
-      toggleTooltip();
-    }
+  function hideTooltip() {
+    clearHideTimeout();
+    setVisible(false);
   }
 
   function showTooltip() {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
     clearHideTimeout();
-    updatePosition();
+    setPosition(computeTooltipPosition(trigger));
     setMounted(true);
     window.requestAnimationFrame(() => setVisible(true));
   }
 
   function scheduleHide() {
     clearHideTimeout();
-    hideTimeoutRef.current = window.setTimeout(() => {
-      setVisible(false);
-    }, TOOLTIP_HIDE_DELAY_MS);
+    hideTimeoutRef.current = window.setTimeout(hideTooltip, TOOLTIP_HIDE_DELAY_MS);
+  }
+
+  function toggleTooltip() {
+    if (visible) {
+      hideTooltip();
+      return;
+    }
+    showTooltip();
+  }
+
+  function handleTriggerClick() {
+    if (isCoarsePointer()) {
+      toggleTooltip();
+    }
+  }
+
+  function handleTriggerBlur(event: FocusEvent<HTMLButtonElement>) {
+    if (tooltipRef.current?.contains(event.relatedTarget as Node)) return;
+    scheduleHide();
   }
 
   useEffect(() => {
@@ -129,7 +159,9 @@ function DemoScriptTooltip() {
     if (!mounted) return;
 
     function handleResize() {
-      updatePosition();
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      setPosition(computeTooltipPosition(trigger));
     }
 
     window.addEventListener("resize", handleResize);
@@ -141,7 +173,7 @@ function DemoScriptTooltip() {
   return (
     <>
       <p id={descriptionId} className="visually-hidden">
-        {demoScriptScreenReaderText()}
+        {formatDemoScriptForScreenReader()}
       </p>
       <button
         ref={triggerRef}
@@ -154,11 +186,7 @@ function DemoScriptTooltip() {
         onMouseLeave={scheduleHide}
         onClick={handleTriggerClick}
         onFocus={showTooltip}
-        onBlur={(event) => {
-          if (!tooltipRef.current?.contains(event.relatedTarget as Node)) {
-            scheduleHide();
-          }
-        }}
+        onBlur={handleTriggerBlur}
       >
         Demo script
       </button>
@@ -183,46 +211,121 @@ function DemoScriptTooltip() {
   );
 }
 
+type CallStatusBannerProps = {
+  status: CallStatus;
+  errorMessage: string | null;
+};
+
+function CallStatusBanner({ status, errorMessage }: CallStatusBannerProps) {
+  if (status === "connecting") {
+    return (
+      <p className="demo-call-status" role="status" aria-live="polite">
+        Connecting…
+      </p>
+    );
+  }
+
+  if (status === "connected") {
+    return (
+      <p className="demo-call-status demo-call-status--live" role="status" aria-live="polite">
+        <span className="demo-call-live-dot" aria-hidden />
+        Live with agent
+      </p>
+    );
+  }
+
+  if (status === "error" && errorMessage) {
+    return (
+      <p className="demo-call-error" role="alert">
+        {errorMessage}
+      </p>
+    );
+  }
+
+  return null;
+}
+
+type CallActionButtonsProps = {
+  status: CallStatus;
+  muted: boolean;
+  onStartCall: () => void;
+  onEndCall: () => void;
+  onToggleMute: () => void;
+};
+
+function CallActionButtons({
+  status,
+  muted,
+  onStartCall,
+  onEndCall,
+  onToggleMute,
+}: CallActionButtonsProps) {
+  const isConnected = status === "connected";
+  const isConnecting = status === "connecting";
+
+  return (
+    <div className="demo-call-actions">
+      {isConnected ? (
+        <>
+          <button type="button" className="demo-call-btn demo-call-btn--secondary" onClick={onToggleMute}>
+            {muted ? "Unmute" : "Mute"}
+          </button>
+          <button type="button" className="demo-call-btn demo-call-btn--primary" onClick={onEndCall}>
+            End call
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="demo-call-btn demo-call-btn--primary"
+          onClick={onStartCall}
+          disabled={isConnecting}
+        >
+          {isConnecting ? "Connecting…" : "Start demo call"}
+        </button>
+      )}
+      <DemoScriptTooltip />
+    </div>
+  );
+}
+
 export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
   const connectionRef = useRef<VoiceConnection | null>(null);
   const [status, setStatus] = useState<CallStatus>("idle");
   const [muted, setMuted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  function handleDisconnect() {
+    setStatus("idle");
+    setMuted(false);
+    connectionRef.current = null;
+    onCallEnded?.();
+  }
+
+  function handleVoiceError(error: unknown) {
+    console.error(error);
+    setErrorMessage("The voice connection was interrupted.");
+    setStatus("error");
+  }
+
   async function startCall() {
     setStatus("connecting");
     setErrorMessage(null);
 
     try {
-      const tokenResponse: VoiceTokenResponse = await fetchVoiceToken();
-
-      const voiceConfig = {
-        url: tokenResponse.url,
-        token: tokenResponse.token,
-        room_name: tokenResponse.room_name,
-      };
-
+      const tokenResponse = await fetchVoiceToken();
       const { HappyRobotVoiceClient } = await import("@happyrobot-ai/sdk/voice");
-      const voice = new HappyRobotVoiceClient(voiceConfig);
+      const voice = new HappyRobotVoiceClient(buildVoiceConfig(tokenResponse));
 
       const connection = await voice.connect({
         onConnected: () => setStatus("connected"),
-        onDisconnected: () => {
-          setStatus("idle");
-          setMuted(false);
-          connectionRef.current = null;
-          onCallEnded?.();
-        },
+        onDisconnected: handleDisconnect,
         onAgentConnected: (participant) => {
           console.log("Agent joined:", participant.identity);
         },
         onReconnecting: () => setStatus("connecting"),
         onReconnected: () => setStatus("connected"),
-        onError: (error) => {
-          console.error(error);
-          setErrorMessage("The voice connection was interrupted.");
-          setStatus("error");
-        },
+        onError: handleVoiceError,
       });
 
       connectionRef.current = connection;
@@ -235,10 +338,7 @@ export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
 
   async function endCall() {
     await connectionRef.current?.disconnect();
-    connectionRef.current = null;
-    setStatus("idle");
-    setMuted(false);
-    onCallEnded?.();
+    handleDisconnect();
   }
 
   async function toggleMute() {
@@ -255,58 +355,16 @@ export function DemoCallLauncher({ onCallEnded }: DemoCallLauncherProps) {
     setMuted(true);
   }
 
-  const isConnected = status === "connected";
-  const isConnecting = status === "connecting";
-
   return (
     <div className="demo-call" aria-label="Live demo call">
-      {isConnecting && !isConnected ? (
-        <p className="demo-call-status" role="status" aria-live="polite">
-          Connecting…
-        </p>
-      ) : null}
-
-      {isConnected ? (
-        <p className="demo-call-status demo-call-status--live" role="status" aria-live="polite">
-          <span className="demo-call-live-dot" aria-hidden />
-          Live with agent
-        </p>
-      ) : null}
-
-      {status === "error" && errorMessage ? (
-        <p className="demo-call-error" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
-
-      <div className="demo-call-actions">
-        {isConnected ? (
-          <>
-            <button
-              type="button"
-              className="demo-call-btn demo-call-btn--secondary"
-              onClick={toggleMute}
-            >
-              {muted ? "Unmute" : "Mute"}
-            </button>
-            <button type="button" className="demo-call-btn demo-call-btn--primary" onClick={endCall}>
-              End call
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              className="demo-call-btn demo-call-btn--primary"
-              onClick={startCall}
-              disabled={isConnecting}
-            >
-              {isConnecting ? "Connecting…" : "Start demo call"}
-            </button>
-            {!isConnecting ? <DemoScriptTooltip /> : null}
-          </>
-        )}
-      </div>
+      <CallStatusBanner status={status} errorMessage={errorMessage} />
+      <CallActionButtons
+        status={status}
+        muted={muted}
+        onStartCall={startCall}
+        onEndCall={endCall}
+        onToggleMute={toggleMute}
+      />
     </div>
   );
 }
