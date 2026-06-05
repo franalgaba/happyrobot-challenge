@@ -53,6 +53,7 @@ PORT=3000
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 API_KEY=<random secret>
 MCP_PATH_TOKEN=<random unguessable token>
+MCP_AUTH_TOKEN=<random bearer token for HappyRobot MCP calls>
 PUBLIC_API_BASE_URL=https://<api-service>.up.railway.app
 HAPPYROBOT_API_KEY=<server-only HappyRobot key>
 HAPPYROBOT_CLUSTER=us
@@ -78,7 +79,7 @@ VITE_CLIENT_NAME=Acme Logistics
 
 Railway provides HTTPS for the public service URLs, satisfying the challenge HTTPS requirement.
 
-Do not commit generated values for `API_KEY`, `MCP_PATH_TOKEN`, `HAPPYROBOT_API_KEY`, `FMCSA_WEB_KEY`, or any Postgres credentials.
+Do not commit generated values for `API_KEY`, `MCP_PATH_TOKEN`, `MCP_AUTH_TOKEN`, `HAPPYROBOT_API_KEY`, `FMCSA_WEB_KEY`, or any Postgres credentials.
 
 For the POC security assumptions around browser keys, MCP path tokens, FMCSA WebKey usage, Railway TCP proxy exposure, and Terraform state secrets, see [security-poc.md](./security-poc.md).
 

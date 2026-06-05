@@ -29,6 +29,7 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/happyrobot_challenge
       API_KEY: local-dev-api-key
       MCP_PATH_TOKEN: local-dev-mcp-token
+      MCP_AUTH_TOKEN: local-dev-mcp-auth-token
       PUBLIC_API_BASE_URL: http://localhost:3000
       ALLOW_SEEDED_CARRIER_FALLBACK: "true"
       DEMO_CARRIER_MC_NUMBERS: "123456,654321,777888"

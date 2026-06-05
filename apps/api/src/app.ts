@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { MiddlewareHandler } from "hono";
-import { createHash, timingSafeEqual } from "node:crypto";
 import type { RuntimeConfig } from "./env/config";
 import { createMcpRoutes } from "./mcp/routes";
 import { createApiRoutes } from "./routes/api";
@@ -9,18 +8,7 @@ import type { AppServices } from "./services/types";
 import { jsonError } from "./utils/http";
 import { logError, logInfo, redactPathForLogs, requestFields } from "./utils/logging";
 import { requestIdFromHeader, REQUEST_ID_HEADER, setRequestId } from "./utils/request-context";
-
-function digest(value: string) {
-  return createHash("sha256").update(value).digest();
-}
-
-function matchesSecret(provided: string | undefined, expected: string) {
-  if (!provided) {
-    return false;
-  }
-
-  return timingSafeEqual(digest(provided), digest(expected));
-}
+import { matchesSecret } from "./utils/secrets";
 
 function requestTracing(): MiddlewareHandler {
   return async (c, next) => {
@@ -63,7 +51,7 @@ function apiKeyAuth(apiKey: string): MiddlewareHandler {
 }
 
 export function createApp(
-  config: Pick<RuntimeConfig, "apiKey" | "mcpPathToken" | "corsOrigins">,
+  config: Pick<RuntimeConfig, "apiKey" | "mcpPathToken" | "mcpAuthToken" | "corsOrigins">,
   services: AppServices,
 ) {
   const app = new Hono();
@@ -84,7 +72,7 @@ export function createApp(
   app.use("/api/*", apiKeyAuth(config.apiKey));
 
   app.route("/api", createApiRoutes(services));
-  app.route("/mcp", createMcpRoutes(services, config.mcpPathToken));
+  app.route("/mcp", createMcpRoutes(services, { pathToken: config.mcpPathToken, authToken: config.mcpAuthToken }));
 
   app.notFound((c) => jsonError(c, 404, "not_found", "Route not found."));
   app.onError((error, c) => {

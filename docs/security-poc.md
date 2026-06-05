@@ -22,26 +22,28 @@ Before production:
 - Split API capabilities into scoped credentials, such as reporting read access, voice token creation, and tool mutation access.
 - Add audit logging for the authenticated actor or service account.
 
-## MCP Path Token
+## MCP Authentication
 
-HappyRobot MCP registration currently uses a URL:
+HappyRobot MCP registration uses a path-isolated URL plus Bearer authentication:
 
 ```text
 https://<api-service>.up.railway.app/mcp/<MCP_PATH_TOKEN>
+Authorization: Bearer <MCP_AUTH_TOKEN>
 ```
 
-The local HappyRobot SDK reference documents MCP registration by URL only, without custom auth headers. For that reason, the POC uses an unguessable path token rather than `X-API-Key` or `Authorization`.
+`MCP_PATH_TOKEN` keeps the endpoint hard to discover accidentally. `MCP_AUTH_TOKEN` is the request credential stored in the HappyRobot MCP Server integration and sent as `Authorization: Bearer <token>`.
 
 Controls currently in place:
 
 - Wrong MCP tokens return `404`.
+- Missing or invalid MCP bearer tokens return `401`.
 - Runtime logging redacts `/mcp/<token>` as `/mcp/<redacted>`.
 - Terraform-generated MCP tokens are 48 random alphanumeric characters.
 
 Before production:
 
-- Prefer header-based `Authorization: Bearer` auth when HappyRobot supports it for MCP server registration.
-- Rotate `MCP_PATH_TOKEN` if a full MCP URL is exposed in logs, screenshots, or shared tooling.
+- Keep `MCP_AUTH_TOKEN` separate from dashboard/browser credentials.
+- Rotate `MCP_PATH_TOKEN` and `MCP_AUTH_TOKEN` if a full MCP URL or auth token is exposed in logs, screenshots, or shared tooling.
 - Keep the MCP URL out of public docs, browser code, analytics, and issue trackers.
 
 ## FMCSA WebKey
@@ -79,7 +81,7 @@ Before production:
 
 ## Terraform State
 
-Terraform generates and stores `API_KEY`, `MCP_PATH_TOKEN`, and the Postgres password. These values are marked sensitive in outputs, but they still exist in Terraform state.
+Terraform generates and stores `API_KEY`, `MCP_PATH_TOKEN`, `MCP_AUTH_TOKEN`, and the Postgres password. These values are marked sensitive in outputs, but they still exist in Terraform state.
 
 For the POC:
 

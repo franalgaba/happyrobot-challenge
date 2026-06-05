@@ -25,6 +25,11 @@ resource "random_password" "mcp_path_token" {
   special = false
 }
 
+resource "random_password" "mcp_auth_token" {
+  length  = 48
+  special = false
+}
+
 resource "random_password" "postgres_password" {
   length  = 32
   special = false
@@ -139,6 +144,10 @@ resource "railway_variable_collection" "api" {
       {
         name  = "MCP_PATH_TOKEN"
         value = random_password.mcp_path_token.result
+      },
+      {
+        name  = "MCP_AUTH_TOKEN"
+        value = random_password.mcp_auth_token.result
       },
       {
         name  = "PUBLIC_API_BASE_URL"

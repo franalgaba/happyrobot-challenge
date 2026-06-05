@@ -32,6 +32,7 @@ bun run dev:down
    - `DATABASE_URL` (`postgres://postgres:postgres@127.0.0.1:55432/happyrobot_challenge` for local Docker)
    - `API_KEY`
    - `MCP_PATH_TOKEN`
+   - `MCP_AUTH_TOKEN`
    - `PUBLIC_API_BASE_URL`
    - `FMCSA_WEB_KEY` for live FMCSA verification in production-like runs
 
@@ -102,6 +103,7 @@ Dry-run the SDK sync:
 ```bash
 PUBLIC_API_BASE_URL=https://<api-service>.up.railway.app \
 MCP_PATH_TOKEN=<token> \
+MCP_AUTH_TOKEN=<bearer-token> \
 HAPPYROBOT_API_KEY=<key> \
 bun run happyrobot:sync -- --dry-run
 ```
@@ -118,7 +120,7 @@ Publish after verification:
 bun run happyrobot:sync -- --publish
 ```
 
-The sync script creates or updates an `inbound-voice-agent` workflow where possible, registers the Hono MCP server, syncs workflow variables, inspects nodes, and prints manual Builder fallback steps if SDK node attachment is not fully supported by the current template/schema.
+The sync script creates or updates an `inbound-voice-agent` workflow where possible, registers the Hono MCP server with Bearer auth, syncs workflow variables, inspects nodes, and prints manual Builder fallback steps if SDK node attachment is not fully supported by the current template/schema.
 
 ## Operations Dashboard
 

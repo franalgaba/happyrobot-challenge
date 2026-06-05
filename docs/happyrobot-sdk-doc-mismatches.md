@@ -109,7 +109,8 @@ The live API accepted:
 await client.mcp.create({
   server_name: "Carrier Sales Hono MCP",
   server_url: "https://example.com/mcp/<path-token>",
-  auth_type: "none",
+  auth_type: "bearer",
+  auth_token: "<bearer-token>",
 });
 ```
 
@@ -253,7 +254,7 @@ The POC currently handles these mismatches by:
 - matching existing variables by either `key` or legacy `name`,
 - sending variable payloads with environment-specific values,
 - matching MCP servers by either `server_name` / `server_url` or legacy `name` / `url`,
-- registering MCP with `auth_type: "none"`,
+- registering MCP with `auth_type: "bearer"` and `auth_token`,
 - accepting `notifications/initialized`,
 - flattening generated Zod JSON Schemas before returning MCP tools.
 

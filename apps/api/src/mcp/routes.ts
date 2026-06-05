@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import type { AppServices } from "../services/types";
 import { jsonError } from "../utils/http";
 import { logError } from "../utils/logging";
+import { matchesSecret } from "../utils/secrets";
 import { callMcpTool, mcpTools } from "./tools";
 
 const MCP_SERVER_NAME = "happyrobot-carrier-sales-tools";
@@ -13,6 +14,11 @@ const MCP_JSON_RESPONSE_ACCEPT_HEADER = "application/json, text/event-stream";
 const MCP_TOOL_FAILURE_MESSAGE = "MCP tool call failed.";
 
 type McpToolDefinition = (typeof mcpTools)[number];
+
+type McpRouteConfig = {
+  pathToken: string;
+  authToken: string;
+};
 
 function safeMcpArgumentKeys(args: unknown) {
   return typeof args === "object" && args !== null && !Array.isArray(args) ? Object.keys(args) : [];
@@ -30,13 +36,23 @@ function toolCallResult(result: unknown) {
 }
 
 function requestWithMcpAcceptHeader(request: Request) {
-  if (request.headers.has("Accept")) {
+  const accept = request.headers.get("Accept");
+  if (accept && accept !== "*/*") {
     return request;
   }
 
   const headers = new Headers(request.headers);
   headers.set("Accept", MCP_JSON_RESPONSE_ACCEPT_HEADER);
   return new Request(request, { headers });
+}
+
+function bearerToken(authorizationHeader: string | undefined) {
+  const match = authorizationHeader?.match(/^Bearer\s+(.+)$/i);
+  return match?.[1];
+}
+
+function isAuthorized(request: Request, authToken: string) {
+  return matchesSecret(bearerToken(request.headers.get("Authorization") ?? undefined), authToken);
 }
 
 function passThroughMcpInputSchema(schema: JsonSchemaType): StandardSchemaWithJSON<unknown, unknown> {
@@ -91,7 +107,7 @@ function createSdkMcpServer(services: AppServices) {
   return server;
 }
 
-export function createMcpRoutes(services: AppServices, mcpPathToken: string) {
+export function createMcpRoutes(services: AppServices, config: McpRouteConfig) {
   const mcp = new Hono();
   const server = createSdkMcpServer(services);
   const transport = new WebStandardStreamableHTTPServerTransport({
@@ -101,8 +117,13 @@ export function createMcpRoutes(services: AppServices, mcpPathToken: string) {
   const connected = server.connect(transport);
 
   mcp.all("/:token", async (c) => {
-    if (c.req.param("token") !== mcpPathToken) {
+    if (c.req.param("token") !== config.pathToken) {
       return jsonError(c, 404, "mcp_not_found", "MCP server was not found.");
+    }
+
+    if (!isAuthorized(c.req.raw, config.authToken)) {
+      c.header("WWW-Authenticate", 'Bearer realm="mcp"');
+      return jsonError(c, 401, "mcp_unauthorized", "Missing or invalid MCP bearer token.");
     }
 
     await connected;

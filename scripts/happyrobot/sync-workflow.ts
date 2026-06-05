@@ -231,6 +231,7 @@ type McpServer = {
   url?: string;
   server_name?: string;
   server_url?: string;
+  auth_type?: string;
   created_at?: string;
   updated_at?: string;
   last_connected_at?: string;
@@ -239,7 +240,8 @@ type McpServer = {
 type McpServerPayload = {
   server_name: string;
   server_url: string;
-  auth_type: "none";
+  auth_type: "bearer";
+  auth_token: string;
 };
 
 type WorkflowNode = {
@@ -669,11 +671,12 @@ async function configureWorkflowNodes(client: HappyRobotClient, workflowId: stri
   return inspectLatestNodes(client, inspection.latestVersion.id);
 }
 
-function mcpPayload(url: string): McpServerPayload {
+function mcpPayload(url: string, authToken: string): McpServerPayload {
   return {
     server_name: MCP_SERVER_NAME,
     server_url: url,
-    auth_type: "none",
+    auth_type: "bearer",
+    auth_token: authToken,
   };
 }
 
@@ -689,6 +692,10 @@ function mcpServerMatchesUrl(server: McpServer, url: string) {
   return mcpServerUrl(server) === url;
 }
 
+function mcpServerMatchesAuth(server: McpServer) {
+  return server.auth_type === "bearer";
+}
+
 function mcpServerName(server: McpServer) {
   return server.server_name ?? server.name;
 }
@@ -702,19 +709,21 @@ function newestMcpServer(servers: McpServer[]) {
   return [...servers].sort((a, b) => mcpServerSortTime(b) - mcpServerSortTime(a))[0];
 }
 
-async function registerMcp(client: HappyRobotClient, url: string, dryRun: boolean) {
+async function registerMcp(client: HappyRobotClient, url: string, authToken: string, dryRun: boolean) {
   if (dryRun) {
-    console.log(`Would register MCP server "${MCP_SERVER_NAME}" at ${url}`);
+    console.log(`Would register MCP server "${MCP_SERVER_NAME}" at ${redactMcpUrl(url)} with bearer auth.`);
     return null;
   }
 
   const { data } = await client.mcp.list();
-  const matches = (data as McpServer[]).filter((server) => mcpServerMatchesUrl(server, url) && mcpServerName(server) === MCP_SERVER_NAME);
+  const matches = (data as McpServer[]).filter(
+    (server) => mcpServerMatchesUrl(server, url) && mcpServerName(server) === MCP_SERVER_NAME && mcpServerMatchesAuth(server),
+  );
   const existing = newestMcpServer(matches);
   if (existing && matches.length > 1) {
     console.log(`Found ${matches.length} MCP server registrations for ${redactMcpUrl(url)}; using newest ${mcpServerId(existing)}.`);
   }
-  const server = existing ?? (await client.mcp.create(mcpPayload(url)));
+  const server = existing ?? (await client.mcp.create(mcpPayload(url, authToken)));
   const id = mcpServerId(server as McpServer);
 
   if (id) {
@@ -834,6 +843,7 @@ async function main(options: SyncOptions) {
   const apiKey = requiredEnv("HAPPYROBOT_API_KEY");
   const apiBaseUrl = requiredEnv("PUBLIC_API_BASE_URL");
   const token = requiredEnv("MCP_PATH_TOKEN");
+  const mcpAuthToken = requiredEnv("MCP_AUTH_TOKEN");
   const url = mcpUrl(apiBaseUrl, token);
   const prompt = buildAgentPrompt(apiBaseUrl, url);
 
@@ -851,7 +861,7 @@ async function main(options: SyncOptions) {
     await upsertVariable(client, workflow.id, name, value, options.dryRun);
   }
 
-  const mcpServer = await registerMcp(client, url, options.dryRun);
+  const mcpServer = await registerMcp(client, url, mcpAuthToken, options.dryRun);
   const mcpCredentialId = mcpServer ? mcpServerId(mcpServer as McpServer) : undefined;
 
   let nodes: unknown[] = [];

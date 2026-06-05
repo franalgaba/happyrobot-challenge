@@ -5,6 +5,7 @@ const requiredEnv = {
   DATABASE_URL: "postgres://postgres:postgres@localhost:5432/happyrobot_challenge",
   API_KEY: "test-api-key",
   MCP_PATH_TOKEN: "test-mcp-token",
+  MCP_AUTH_TOKEN: "test-mcp-auth-token",
 };
 
 describe("runtime config", () => {

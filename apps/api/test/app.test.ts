@@ -7,8 +7,10 @@ import { ServiceError } from "../src/utils/errors";
 
 const API_KEY = "test-api-key";
 const MCP_PATH_TOKEN = "test-mcp-token";
+const MCP_AUTH_TOKEN = "test-mcp-auth-token";
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const AUTHENTICATED_JSON_HEADERS = { ...JSON_HEADERS, "X-API-Key": API_KEY };
+const MCP_HEADERS = { ...JSON_HEADERS, Authorization: `Bearer ${MCP_AUTH_TOKEN}` };
 const REQUEST_ID = "test-request-123";
 
 function emptyReportSummary(): ReportSummary {
@@ -79,7 +81,7 @@ function services(overrides: Partial<AppServices> = {}): AppServices {
 
 function app(overrides: Partial<AppServices> = {}) {
   return createApp(
-    { apiKey: API_KEY, mcpPathToken: MCP_PATH_TOKEN, corsOrigins: ["http://localhost:5173"] },
+    { apiKey: API_KEY, mcpPathToken: MCP_PATH_TOKEN, mcpAuthToken: MCP_AUTH_TOKEN, corsOrigins: ["http://localhost:5173"] },
     services(overrides),
   );
 }
@@ -95,7 +97,7 @@ function postJson(path: string, body: unknown, overrides: Partial<AppServices> =
 function postMcp(body: unknown, overrides: Partial<AppServices> = {}) {
   return app(overrides).request(`/mcp/${MCP_PATH_TOKEN}`, {
     method: "POST",
-    headers: JSON_HEADERS,
+    headers: MCP_HEADERS,
     body: JSON.stringify(body),
   });
 }
@@ -250,6 +252,28 @@ describe("Hono API", () => {
     await expect(response.json()).resolves.toMatchObject({ result: { tools: expect.arrayContaining([expect.objectContaining({ name: "verify_carrier" })]) } });
   });
 
+  it("requires bearer auth for MCP routes", async () => {
+    const response = await app().request(`/mcp/${MCP_PATH_TOKEN}`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("WWW-Authenticate")).toBe('Bearer realm="mcp"');
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "mcp_unauthorized" } });
+  });
+
+  it("rejects invalid MCP bearer tokens", async () => {
+    const response = await app().request(`/mcp/${MCP_PATH_TOKEN}`, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, Authorization: "Bearer wrong-token" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+
+    expect(response.status).toBe(401);
+  });
+
   it("accepts MCP initialized notifications", async () => {
     const response = await postMcp({ jsonrpc: "2.0", method: "notifications/initialized" });
     expect(response.status).toBe(202);
@@ -282,6 +306,17 @@ describe("Hono API", () => {
     });
   });
 
+  it("normalizes generic fetch Accept headers for MCP requests", async () => {
+    const response = await app().request(`/mcp/${MCP_PATH_TOKEN}`, {
+      method: "POST",
+      headers: { ...MCP_HEADERS, Accept: "*/*" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: "fetch-client", method: "tools/list" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ result: { tools: expect.any(Array) } });
+  });
+
   it("responds to MCP ping requests", async () => {
     const response = await postMcp({ jsonrpc: "2.0", id: "ping-1", method: "ping" });
     expect(response.status).toBe(200);
@@ -291,7 +326,7 @@ describe("Hono API", () => {
   it("returns a JSON-RPC parse error for malformed MCP JSON", async () => {
     const response = await app().request(`/mcp/${MCP_PATH_TOKEN}`, {
       method: "POST",
-      headers: { ...JSON_HEADERS, "X-Request-ID": REQUEST_ID },
+      headers: { ...MCP_HEADERS, "X-Request-ID": REQUEST_ID },
       body: "{",
     });
 

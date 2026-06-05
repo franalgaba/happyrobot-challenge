@@ -50,3 +50,9 @@ output "mcp_path_token" {
   value       = random_password.mcp_path_token.result
   sensitive   = true
 }
+
+output "mcp_auth_token" {
+  description = "Generated MCP bearer token for HappyRobot MCP calls."
+  value       = random_password.mcp_auth_token.result
+  sensitive   = true
+}
