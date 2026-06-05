@@ -2,10 +2,16 @@ workspace_id       = "<railway-workspace-id>"
 project_name       = "happyrobot-challenge"
 source_repo        = "franalgaba/happyrobot-challenge"
 source_repo_branch = "main"
-api_subdomain       = "happyrobot-challenge-api"
+api_subdomain      = "happyrobot-challenge-api"
 dashboard_subdomain = "happyrobot-challenge-dashboard"
-client_name         = "Acme Logistics"
+client_name        = "Acme Logistics"
 
-# Optional external secrets:
-# happyrobot_api_key = ""
-# fmcsa_web_key      = ""
+# Match production API behavior from docs/railway-deployment.md
+demo_carrier_mc_numbers       = "123456,654321,777888"
+allow_seeded_carrier_fallback = false
+api_private_base_url          = "http://api.railway.internal:3000"
+
+# Optional external secrets (set via TF_VAR_* or -var to avoid committing):
+# happyrobot_api_key     = ""
+# happyrobot_workflow_id = ""
+# fmcsa_web_key          = ""

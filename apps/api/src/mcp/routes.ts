@@ -12,6 +12,7 @@ const MCP_SERVER_NAME = "happyrobot-carrier-sales-tools";
 const MCP_SERVER_VERSION = "0.1.0";
 const MCP_JSON_RESPONSE_ACCEPT_HEADER = "application/json, text/event-stream";
 const MCP_TOOL_FAILURE_MESSAGE = "MCP tool call failed.";
+const MCP_BEARER_CHALLENGE = 'Bearer realm="mcp"';
 
 type McpToolDefinition = (typeof mcpTools)[number];
 
@@ -37,7 +38,7 @@ function toolCallResult(result: unknown) {
 
 function requestWithMcpAcceptHeader(request: Request) {
   const accept = request.headers.get("Accept");
-  if (accept && accept !== "*/*") {
+  if (hasMcpCompatibleAcceptHeader(accept)) {
     return request;
   }
 
@@ -46,12 +47,16 @@ function requestWithMcpAcceptHeader(request: Request) {
   return new Request(request, { headers });
 }
 
-function bearerToken(authorizationHeader: string | undefined) {
+function hasMcpCompatibleAcceptHeader(accept: string | null): boolean {
+  return Boolean(accept && accept !== "*/*");
+}
+
+function bearerToken(authorizationHeader: string | undefined): string | undefined {
   const match = authorizationHeader?.match(/^Bearer\s+(.+)$/i);
   return match?.[1];
 }
 
-function isAuthorized(request: Request, authToken: string) {
+function isAuthorizedMcpRequest(request: Request, authToken: string): boolean {
   return matchesSecret(bearerToken(request.headers.get("Authorization") ?? undefined), authToken);
 }
 
@@ -121,8 +126,8 @@ export function createMcpRoutes(services: AppServices, config: McpRouteConfig) {
       return jsonError(c, 404, "mcp_not_found", "MCP server was not found.");
     }
 
-    if (!isAuthorized(c.req.raw, config.authToken)) {
-      c.header("WWW-Authenticate", 'Bearer realm="mcp"');
+    if (!isAuthorizedMcpRequest(c.req.raw, config.authToken)) {
+      c.header("WWW-Authenticate", MCP_BEARER_CHALLENGE);
       return jsonError(c, 401, "mcp_unauthorized", "Missing or invalid MCP bearer token.");
     }
 

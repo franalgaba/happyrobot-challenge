@@ -148,18 +148,14 @@ export function createCarrierService(
     return record;
   }
 
-  function buildFmcsaLookupUrl(mcNumber: string) {
+  function buildFmcsaLookupUrl(mcNumber: string, webKey: string): URL {
     const url = new URL(`${FMCSA_DOCKET_LOOKUP_BASE_URL}/${mcNumber}`);
-    url.searchParams.set("webKey", config.fmcsaWebKey ?? "");
+    url.searchParams.set("webKey", webKey);
     return url;
   }
 
-  async function verifyWithFmcsa(mcNumber: string): Promise<VerifyCarrierResponse | null> {
-    if (!config.fmcsaWebKey) {
-      return null;
-    }
-
-    const response = await fetch(buildFmcsaLookupUrl(mcNumber));
+  async function fetchFmcsaCarrier(mcNumber: string, webKey: string): Promise<{ payload: Record<string, unknown>; carrier: FmcsaCarrier } | null> {
+    const response = await fetch(buildFmcsaLookupUrl(mcNumber, webKey));
     if (!response.ok) {
       throw new Error(`FMCSA lookup failed with status ${response.status}`);
     }
@@ -170,6 +166,10 @@ export function createCarrierService(
       return null;
     }
 
+    return { payload, carrier };
+  }
+
+  async function storeFmcsaCarrier(mcNumber: string, payload: Record<string, unknown>, carrier: FmcsaCarrier): Promise<VerifyCarrierResponse> {
     const allowedToOperate = parseFmcsaBoolean(carrier.allowedToOperate);
     const outOfService = parseFmcsaBoolean(carrier.outOfService);
     const eligible = isEligibleCarrier({ allowedToOperate, outOfService });
@@ -197,6 +197,15 @@ export function createCarrierService(
       reason: fmcsaReason(eligible),
       verifiedAt: stored.verifiedAt,
     });
+  }
+
+  async function verifyWithFmcsa(mcNumber: string): Promise<VerifyCarrierResponse | null> {
+    if (!config.fmcsaWebKey) {
+      return null;
+    }
+
+    const result = await fetchFmcsaCarrier(mcNumber, config.fmcsaWebKey);
+    return result ? storeFmcsaCarrier(mcNumber, result.payload, result.carrier) : null;
   }
 
   async function verifyFromSeed(mcNumber: string): Promise<VerifyCarrierResponse> {

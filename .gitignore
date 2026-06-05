@@ -8,3 +8,7 @@ coverage/
 .DS_Store
 *.log
 tmp/
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/terraform.tfvars

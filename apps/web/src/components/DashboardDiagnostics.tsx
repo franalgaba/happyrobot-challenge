@@ -108,8 +108,8 @@ export function DashboardDiagnostics({ summary }: DashboardDiagnosticsProps) {
             </dl>
             <p className="diagnostics-footnote kpi-hint">
               {verificationTotal === 0
-                ? "Verification runs when a carrier provides an MC number."
-                : "Use live FMCSA in production; seeded records support local demos."}
+                ? "Demo with live FMCSA MC 585242 (Corbin & Whetstone Trucking LLC)."
+                : "Use live FMCSA in production; demo MC 585242 verifies against FMCSA directly."}
             </p>
           </section>
         </div>

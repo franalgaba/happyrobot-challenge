@@ -67,15 +67,17 @@ CORS_ORIGINS=https://<dashboard-service>.up.railway.app,http://localhost:5173,ht
 
 The API uses live FMCSA for non-demo MCs. If `FMCSA_WEB_KEY` is missing, only MCs in `DEMO_CARRIER_MC_NUMBERS` can use seeded data; other MCs fail verification instead of silently falling back. Use `ALLOW_SEEDED_CARRIER_FALLBACK=true` only for broad local/POC demos where every seeded carrier can be accepted.
 
-Set the `dashboard` service variables. `API_BASE_URL` and `API_KEY` are runtime server variables used by the dashboard proxy; `VITE_CLIENT_NAME` is read at build time by Vite.
+Set the `dashboard` service variables. `API_BASE_URL` and `API_KEY` are runtime server variables used by the dashboard BFF proxy; `VITE_CLIENT_NAME` is read at Docker build time.
 
 ```text
 NODE_ENV=production
 PORT=8080
-API_BASE_URL=https://<api-service>.up.railway.app
+API_BASE_URL=http://api.railway.internal:3000
 API_KEY=<same value as the API service API_KEY>
 VITE_CLIENT_NAME=Acme Logistics
 ```
+
+Use Railway private networking for dashboard → API traffic. The public API URL is only required on the API service as `PUBLIC_API_BASE_URL` for HappyRobot MCP registration.
 
 Railway provides HTTPS for the public service URLs, satisfying the challenge HTTPS requirement.
 
@@ -148,7 +150,7 @@ The Terraform stack manages:
 - Postgres TCP proxy for bootstrap/admin tasks,
 - Railway-provided domains for API and dashboard,
 - generated API/MCP/Postgres secrets,
-- API, dashboard, and database variable collections (including API `CORS_ORIGINS` for the dashboard URL).
+- API, dashboard, and database variable collections (including `DEMO_CARRIER_MC_NUMBERS`, `ALLOW_SEEDED_CARRIER_FALLBACK`, optional `HAPPYROBOT_WORKFLOW_ID`, dashboard private `API_BASE_URL`, and API `CORS_ORIGINS` for the dashboard URL).
 
 Use Terraform for new environments. To adopt the current live CLI-created project, import the live project and services first, then inspect `terraform plan` carefully before applying.
 

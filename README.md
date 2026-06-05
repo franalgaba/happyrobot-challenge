@@ -122,6 +122,12 @@ bun run happyrobot:sync -- --publish
 
 The sync script creates or updates an `inbound-voice-agent` workflow where possible, registers the Hono MCP server with Bearer auth, syncs workflow variables, inspects nodes, and prints manual Builder fallback steps if SDK node attachment is not fully supported by the current template/schema.
 
+## Documentation
+
+- **[docs/architecture.md](docs/architecture.md)** — system components, interaction flows, data model, and deployment topology
+- **[docs/dashboard.md](docs/dashboard.md)** — operations dashboard setup and troubleshooting
+- **[docs/railway-deployment.md](docs/railway-deployment.md)** — Railway deploy
+
 ## Operations Dashboard
 
 Client-facing metrics UI in `apps/web` (Vite + React). See **[docs/dashboard.md](docs/dashboard.md)** for setup, Docker Compose, Railway/Terraform deploy, environment variables, branding, and troubleshooting.

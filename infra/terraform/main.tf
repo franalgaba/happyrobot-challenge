@@ -160,12 +160,26 @@ resource "railway_variable_collection" "api" {
       {
         name  = "HAPPYROBOT_ENVIRONMENT"
         value = var.happyrobot_environment
+      },
+      {
+        name  = "DEMO_CARRIER_MC_NUMBERS"
+        value = var.demo_carrier_mc_numbers
+      },
+      {
+        name  = "ALLOW_SEEDED_CARRIER_FALLBACK"
+        value = var.allow_seeded_carrier_fallback ? "true" : "false"
       }
     ],
     var.happyrobot_api_key == "" ? [] : [
       {
         name  = "HAPPYROBOT_API_KEY"
         value = var.happyrobot_api_key
+      }
+    ],
+    var.happyrobot_workflow_id == "" ? [] : [
+      {
+        name  = "HAPPYROBOT_WORKFLOW_ID"
+        value = var.happyrobot_workflow_id
       }
     ],
     var.fmcsa_web_key == "" ? [] : [
@@ -198,7 +212,7 @@ resource "railway_variable_collection" "dashboard" {
     },
     {
       name  = "API_BASE_URL"
-      value = "https://${railway_service_domain.api.domain}"
+      value = var.api_private_base_url
     },
     {
       name  = "API_KEY"

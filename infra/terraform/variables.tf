@@ -104,3 +104,27 @@ variable "fmcsa_web_key" {
   default     = ""
   sensitive   = true
 }
+
+variable "happyrobot_workflow_id" {
+  description = "HappyRobot workflow ID for voice token requests. Leave blank to omit the variable."
+  type        = string
+  default     = ""
+}
+
+variable "demo_carrier_mc_numbers" {
+  description = "Comma-separated demo MC numbers that may use seeded verification data."
+  type        = string
+  default     = "123456,654321,777888"
+}
+
+variable "allow_seeded_carrier_fallback" {
+  description = "Allow broad seeded carrier fallback when FMCSA is unavailable. Keep false in production."
+  type        = bool
+  default     = false
+}
+
+variable "api_private_base_url" {
+  description = "Private Railway hostname the dashboard BFF uses to reach the API service."
+  type        = string
+  default     = "http://api.railway.internal:3000"
+}

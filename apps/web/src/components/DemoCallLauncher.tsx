@@ -12,8 +12,14 @@ type DemoScriptStep = {
   detail?: string;
 };
 
+const DEMO_MC_NUMBER = "585242";
+
 const DEMO_SCRIPT_STEPS: DemoScriptStep[] = [
-  { label: "MC number", value: "123456" },
+  {
+    label: "MC number",
+    value: DEMO_MC_NUMBER,
+    detail: "Live FMCSA — Corbin & Whetstone Trucking LLC",
+  },
   { label: "Lane", detail: "Atlanta → Dallas dry van" },
   { label: "Counter", value: "$2,600" },
   { label: "Close", detail: "Accept the counter, then wrap up after transfer" },

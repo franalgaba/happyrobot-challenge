@@ -1,10 +1,10 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
-function digest(value: string) {
+function digest(value: string): Buffer {
   return createHash("sha256").update(value).digest();
 }
 
-export function matchesSecret(provided: string | undefined, expected: string) {
+export function matchesSecret(provided: string | undefined, expected: string): boolean {
   if (!provided) {
     return false;
   }
